@@ -1,5 +1,9 @@
 # Backend
 
+Run `./lambda.sh <LAMBDA-NUMBER> y` to update the Lambda. You can specify `n` to only upload the zip to S3 but not actually update the code, since, at the moment, this is needed before deploying the stack.
+
+Run `./deploy.sh` to deploy the stack.
+
 Before comitting, ensure that your files are formatted with `black .`
 
 ## GatherReviewsLambda
