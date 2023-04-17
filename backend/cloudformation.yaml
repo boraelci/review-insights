@@ -203,7 +203,14 @@ Resources:
       PathPart: products
       ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
 
-  ProductsOptionsMethod:
+  AnalysisResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      PathPart: analyses
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+
+  ProductOptionsMethod:
     DependsOn:
       - ProductModel
     Type: AWS::ApiGateway::Method
@@ -231,7 +238,7 @@ Resources:
           application/json: '{"statusCode": 200}'
         Type: MOCK
 
-  ProductsPostMethod:
+  ProductPostMethod:
     DependsOn:
       - ProductModel
     Type: AWS::ApiGateway::Method
@@ -242,6 +249,8 @@ Resources:
       AuthorizationType: NONE
       OperationName: CreateProduct
       RequestParameters: {}
+      RequestModels:
+        "application/json": "ProductModel"
       MethodResponses:
         - ResponseParameters:
             method.response.header.Access-Control-Allow-Headers: false
@@ -253,25 +262,76 @@ Resources:
         IntegrationHttpMethod: POST
         IntegrationResponses:
           - ResponseParameters:
-              method.response.header.Access-Control-Allow-Origin: "*"
-            StatusCode: 200
-        PassthroughBehavior: WHEN_NO_TEMPLATES
+              "method.response.header.Access-Control-Allow-Origin": "'*'"
+            StatusCode: "200"
+        PassthroughBehavior: "WHEN_NO_TEMPLATES"
+        Type: "AWS"
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FrontendLambdaName}/invocations"
+
+  AnalysisOptionsMethod:
+    DependsOn:
+      - AnalysisModel
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref AnalysisResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters: {}
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          StatusCode: 200
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              "method.response.header.Access-Control-Allow-Methods": "'GET,OPTIONS'"
+              "method.response.header.Access-Control-Allow-Origin": "'*'"
+            StatusCode: "200"
+        PassthroughBehavior: "WHEN_NO_MATCH"
         RequestTemplates:
-          "application/json": |
-            {
-                "name": "$input.params('name')",
-                "link": "$input.params('link')",
-                "category": "$input.params('category')"
-            }
-        Type: AWS
-        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FrontendLambdaName}/invocations
+          "application/json": '{"statusCode": 200}'
+        Type: "MOCK"
+
+  AnalysisGetMethod:
+    DependsOn:
+      - AnalysisModel
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref AnalysisResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      OperationName: GetAnalysis
+      RequestParameters: {}
+      RequestModels:
+        "application/json": "AnalysisModel"
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          StatusCode: 200
+      Integration:
+        ContentHandling: "CONVERT_TO_TEXT"
+        IntegrationHttpMethod: "POST"
+        IntegrationResponses:
+          - ResponseParameters:
+              "method.response.header.Access-Control-Allow-Origin": "'*'"
+            StatusCode: "200"
+        PassthroughBehavior: "WHEN_NO_TEMPLATES"
+        Type: "AWS"
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FrontendLambdaName}/invocations"
 
   SellerModel:
     Type: AWS::ApiGateway::Model
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
       Name: SellerModel
-      Schema: |
+      Schema: !Sub |
         {
           "type" : "object",
           "properties" : {
@@ -290,7 +350,7 @@ Resources:
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
       Name: ProductModel
-      Schema: |
+      Schema: !Sub |
         {
           "type" : "object",
           "properties" : {
@@ -308,6 +368,122 @@ Resources:
             },
             "seller_id" : {
               "type" : "string"
+            }
+          }
+        }
+      ContentType: application/json
+
+  AnalysisModel:
+    Type: AWS::ApiGateway::Model
+    DependsOn:
+      - HistoricalDataModel
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      Name: AnalysisModel
+      Schema: !Sub |
+        {
+          "type" : "object",
+          "properties" : {
+            "analysis_id" : {
+              "type" : "string"
+            },
+            "historical_data" : {
+              "$ref" : "https://apigateway.amazonaws.com/restapis/${ApiGatewayRestApi}/models/HistoricalDataModel"
+            },
+            "categorical_data" : {
+              "$ref" : "https://apigateway.amazonaws.com/restapis/${ApiGatewayRestApi}/models/CategoricalDataModel"
+            }
+          }
+        }
+      ContentType: application/json
+
+  HistoricalDataModel:
+    Type: AWS::ApiGateway::Model
+    DependsOn:
+      - MonthlyCountModel
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      Name: HistoricalDataModel
+      Schema: !Sub |
+        {
+          "type" : "object",
+          "properties" : {
+            "positive" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "https://apigateway.amazonaws.com/restapis/${ApiGatewayRestApi}/models/MonthlyCountModel"
+              }
+            },
+            "negative" : {
+              "type" : "array",
+              "items" : {
+                "$ref" : "https://apigateway.amazonaws.com/restapis/${ApiGatewayRestApi}/models/MonthlyCountModel"
+              }
+            }
+          }
+        }
+      ContentType: application/json
+
+  CategoricalDataModel:
+    Type: AWS::ApiGateway::Model
+    DependsOn:
+      - CategoricalCountModel
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      Name: CategoricalDataModel
+      Schema: !Sub |
+        {
+          "type": "object",
+          "properties": {
+            "positive": {
+              "type": "array",
+              "items": {
+                "$ref": "https://apigateway.amazonaws.com/restapis/${ApiGatewayRestApi}/models/CategoricalCountModel"
+              }
+            },
+            "negative": {
+              "type": "array",
+              "items": {
+                "$ref": "https://apigateway.amazonaws.com/restapis/${ApiGatewayRestApi}/models/CategoricalCountModel"
+              }
+            }
+          }
+        }
+      ContentType: application/json
+
+  MonthlyCountModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      Name: MonthlyCountModel
+      Schema: !Sub |
+        {
+          "type": "object",
+          "properties": {
+            "month": {
+              "type": "string"
+            },
+            "count": {
+              "type": "string"
+            }
+          }
+        }
+      ContentType: application/json
+
+  CategoricalCountModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      Name: CategoricalCountModel
+      Schema: !Sub |
+        {
+          "type": "object",
+          "properties": {
+            "category": {
+              "type": "string"
+            },
+            "count": {
+              "type": "string"
             }
           }
         }
