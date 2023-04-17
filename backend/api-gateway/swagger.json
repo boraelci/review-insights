@@ -1,0 +1,484 @@
+{
+  "openapi" : "3.0.0",
+  "info" : {
+    "version" : "v0",
+    "title" : "Review Insights - OpenAPI Definition",
+    "description" : "Online product reviews are an essential tool for buyers and sellers to make informed decisions. However, it is time-consuming and overwhelming for sellers to go through thousands of reviews, trying to understand the sentiments of their customers. Moreover, sellers struggle to extract useful information from the reviews that can improve their products, sales, and customer experience. Our project aims to provide an automated and user-friendly solution for sellers to analyze the sentiments of their customers and extract meaningful information from their reviews. By doing so, sellers can improve their products, respond to customer concerns, and enhance their overall business performance."
+  },
+  "tags" : [ {
+    "name" : "Seller"
+  }, {
+    "name" : "Product"
+  }, {
+    "name" : "Analysis"
+  } ],
+  "paths" : {
+    "/sellers" : {
+      "get" : {
+        "tags" : [ "Seller" ],
+        "summary" : "List all sellers",
+        "operationId" : "list_sellers",
+        "responses" : {
+          "200" : {
+            "description" : "Success",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "sellers" : {
+                      "type" : "array",
+                      "items" : {
+                        "$ref" : "#/components/schemas/seller"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found"
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "Seller" ],
+        "summary" : "Create a seller",
+        "operationId" : "create_seller",
+        "responses" : {
+          "200" : {
+            "description" : "Success"
+          },
+          "400" : {
+            "description" : "Bad request"
+          }
+        },
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/seller"
+              }
+            }
+          },
+          "description" : "Resource to create"
+        }
+      }
+    },
+    "/sellers/{seller_id}" : {
+      "get" : {
+        "tags" : [ "Seller" ],
+        "summary" : "Get a seller",
+        "operationId" : "get_seller",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "seller_id",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Success",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/seller"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found"
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "Seller" ],
+        "summary" : "Update a seller",
+        "operationId" : "update_seller",
+        "responses" : {
+          "200" : {
+            "description" : "Success"
+          },
+          "404" : {
+            "description" : "Resource not found"
+          }
+        },
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "seller_id",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/seller"
+              }
+            }
+          },
+          "description" : "Resource to update"
+        }
+      }
+    },
+    "/sellers/{seller_id}/delete" : {
+      "post" : {
+        "tags" : [ "Seller" ],
+        "summary" : "Delete a seller",
+        "operationId" : "delete_seller",
+        "responses" : {
+          "200" : {
+            "description" : "Success"
+          },
+          "404" : {
+            "description" : "Resource not found"
+          }
+        },
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "seller_id",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true
+        } ]
+      }
+    },
+    "/products" : {
+      "get" : {
+        "tags" : [ "Product" ],
+        "summary" : "List all products of a specific seller",
+        "operationId" : "list_products",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "seller_id",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Success",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "sellers" : {
+                      "type" : "array",
+                      "items" : {
+                        "$ref" : "#/components/schemas/product"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found"
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "Product" ],
+        "summary" : "Create a product",
+        "operationId" : "create_product",
+        "responses" : {
+          "200" : {
+            "description" : "Success"
+          },
+          "400" : {
+            "description" : "Bad request"
+          }
+        },
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/product"
+              }
+            }
+          },
+          "description" : "Resource to create"
+        }
+      }
+    },
+    "/products/{product_id}" : {
+      "get" : {
+        "tags" : [ "Product" ],
+        "summary" : "Get a product",
+        "operationId" : "get_product",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "product_id",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Success",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/product"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found"
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "Product" ],
+        "summary" : "Update a product",
+        "operationId" : "update_product",
+        "responses" : {
+          "200" : {
+            "description" : "Success"
+          },
+          "404" : {
+            "description" : "Resource not found"
+          }
+        },
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "product_id",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/product"
+              }
+            }
+          },
+          "description" : "Resource to update"
+        }
+      }
+    },
+    "/products/{product_id}/delete" : {
+      "post" : {
+        "tags" : [ "Product" ],
+        "summary" : "Delete a product",
+        "operationId" : "delete_product",
+        "responses" : {
+          "200" : {
+            "description" : "Success"
+          },
+          "404" : {
+            "description" : "Resource not found"
+          }
+        },
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "product_id",
+          "schema" : {
+            "type" : "string"
+          },
+          "required" : true
+        } ]
+      }
+    },
+    "/analyses" : {
+      "get" : {
+        "tags" : [ "Analysis" ],
+        "summary" : "List all analyses of a specific product",
+        "operationId" : "list_analyses",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "product_id",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Success",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "type" : "object",
+                  "properties" : {
+                    "sellers" : {
+                      "type" : "array",
+                      "items" : {
+                        "$ref" : "#/components/schemas/analysis"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found"
+          }
+        }
+      }
+    },
+    "/analyses/{analysis_id}" : {
+      "get" : {
+        "tags" : [ "Analysis" ],
+        "summary" : "Get an analysis",
+        "operationId" : "get_analysis",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "analysis_id",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Success",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/analysis"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Resource not found"
+          }
+        }
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "seller" : {
+        "type" : "object",
+        "properties" : {
+          "seller_id" : {
+            "type" : "string",
+            "example" : "apple"
+          },
+          "seller_name" : {
+            "type" : "string",
+            "example" : "Apple"
+          }
+        }
+      },
+      "product" : {
+        "type" : "object",
+        "properties" : {
+          "product_id" : {
+            "type" : "string",
+            "example" : "airpods-2"
+          },
+          "product_link" : {
+            "type" : "string",
+            "example" : "https://www.amazon.com/Apple-AirPods-Charging-Latest-Model/dp/B07PXGQC1Q"
+          },
+          "product_name" : {
+            "type" : "string",
+            "example" : "Apple Airpods (2nd Generation)"
+          },
+          "product_category" : {
+            "type" : "string",
+            "example" : "Apple Products"
+          },
+          "seller_id" : {
+            "type" : "string",
+            "example" : "apple"
+          }
+        }
+      },
+      "analysis" : {
+        "type" : "object",
+        "properties" : {
+          "analysis_id" : {
+            "type" : "string",
+            "example" : "string"
+          },
+          "HistoricalData" : {
+            "$ref" : "#/components/schemas/HistoricalData"
+          },
+          "CategoricalData" : {
+            "$ref" : "#/components/schemas/CategoricalData"
+          }
+        }
+      },
+      "HistoricalData" : {
+        "type" : "object",
+        "properties" : {
+          "positive" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MonthlyCount"
+            }
+          },
+          "negative" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MonthlyCount"
+            }
+          }
+        }
+      },
+      "CategoricalData" : {
+        "type" : "object",
+        "properties" : {
+          "positive" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CategoricalCount"
+            }
+          },
+          "negative" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/CategoricalCount"
+            }
+          }
+        }
+      },
+      "MonthlyCount" : {
+        "type" : "object",
+        "properties" : {
+          "month" : {
+            "type" : "string",
+            "example" : "January"
+          },
+          "count" : {
+            "type" : "string",
+            "example" : 3
+          }
+        }
+      },
+      "CategoricalCount" : {
+        "type" : "object",
+        "properties" : {
+          "category" : {
+            "type" : "string",
+            "example" : "Ease of use"
+          },
+          "count" : {
+            "type" : "string",
+            "example" : 5
+          }
+        }
+      }
+    }
+  }
+}

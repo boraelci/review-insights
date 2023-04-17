@@ -1,0 +1,255 @@
+Parameters:
+  ArtifactsBucketName:
+    Type: String
+    Default: artifacts-412391315699
+
+  FrontendLambdaName:
+    Type: String
+    Default: frontend-lambda
+
+  GatherReviewsLambdaName:
+    Type: String
+    Default: gather-reviews-lambda
+
+  GatherReviewsQueueName:
+    Type: String
+    Default: gather-reviews-queue
+
+Resources:
+  FrontendLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  FrontendLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Environment:
+        Variables:
+          ENV: prod
+      FunctionName: !Ref FrontendLambdaName
+      Handler: main.lambda_handler
+      Runtime: python3.8
+      Role: !GetAtt FrontendLambdaRole.Arn
+      Architectures:
+        - x86_64
+      Code:
+        ZipFile: >
+          def lambda_handler(event, context):
+            return {
+              'statusCode': 200,
+              'body': 'Hello from Lambda!',
+              'headers': {
+                'Content-Type': 'text/plain',
+                'Access-Control-Allow-Origin': '*'
+              }
+            }
+      MemorySize: 128
+      Timeout: 3
+      EphemeralStorage:
+        Size: 512
+
+  HeadlessChromeLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: headless-chrome-layer
+      Content:
+        S3Bucket: !Ref ArtifactsBucketName
+        S3Key: !Sub ${GatherReviewsLambdaName}/layer-headless_chrome.zip
+      CompatibleRuntimes:
+        - python3.8
+
+  GatherReviewsLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AmazonSQSFullAccess
+
+  GatherReviewsLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Environment:
+        Variables:
+          ENV: prod
+          AWS_ACCOUNT_ID: !Ref AWS::AccountId
+      FunctionName: !Ref GatherReviewsLambdaName
+      Handler: main.lambda_handler
+      Runtime: python3.8
+      Role: !GetAtt GatherReviewsLambdaRole.Arn
+      Layers:
+        - !Ref HeadlessChromeLayer
+      Architectures:
+        - x86_64
+      Code:
+        S3Bucket: !Ref ArtifactsBucketName
+        S3Key: !Sub ${GatherReviewsLambdaName}/lambda_function.zip
+      MemorySize: 1024
+      Timeout: 120
+      EphemeralStorage:
+        Size: 512
+
+  GatherReviewsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Ref GatherReviewsQueueName
+      VisibilityTimeout: 120
+
+  GatherReviewsLambdaSQSTrigger:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 1
+      Enabled: true
+      EventSourceArn: !GetAtt GatherReviewsQueue.Arn
+      FunctionName: !Ref GatherReviewsLambda
+
+  ApiGatewayRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: Review Insights2
+      ApiKeySourceType: "HEADER"
+      EndpointConfiguration:
+        Types:
+          - "REGIONAL"
+
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - "ProductsOptionsMethod"
+      - "ProductsPostMethod"
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      StageName: prod
+
+  ProductResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      PathPart: products
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+
+  ProductsOptionsMethod:
+    DependsOn:
+      - ProductModel
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ProductResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      RequestParameters: {}
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          StatusCode: 200
+      Integration:
+        IntegrationResponses:
+          - ResponseParameters:
+              "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              "method.response.header.Access-Control-Allow-Methods": "'GET,OPTIONS'"
+              "method.response.header.Access-Control-Allow-Origin": "'*'"
+            StatusCode: "200"
+        PassthroughBehavior: "WHEN_NO_MATCH"
+        RequestTemplates:
+          "application/json": '{"statusCode": 200}'
+        Type: "MOCK"
+
+  ProductsPostMethod:
+    DependsOn:
+      - ProductModel
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ProductResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      OperationName: CreateProduct
+      RequestParameters: {}
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          StatusCode: 200
+      Integration:
+        ContentHandling: "CONVERT_TO_TEXT"
+        IntegrationHttpMethod: "POST"
+        IntegrationResponses:
+          - ResponseParameters:
+              "method.response.header.Access-Control-Allow-Origin": "'*'"
+            StatusCode: "200"
+        PassthroughBehavior: "WHEN_NO_TEMPLATES"
+        RequestTemplates:
+          "application/json": |
+            {
+                "name": "$input.params('name')",
+                "link": "$input.params('link')",
+                "category": "$input.params('category')"
+            }
+        Type: "AWS"
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FrontendLambdaName}/invocations"
+
+  SellerModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      Name: SellerModel
+      Schema: |
+        {
+          "type" : "object",
+          "properties" : {
+            "seller_id" : {
+              "type" : "string"
+            },
+            "seller_name" : {
+              "type" : "string"
+            }
+          }
+        }
+      ContentType: application/json
+
+  ProductModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      Name: ProductModel
+      Schema: |
+        {
+          "type" : "object",
+          "properties" : {
+            "product_id" : {
+              "type" : "string"
+            },
+            "product_link" : {
+              "type" : "string"
+            },
+            "product_name" : {
+              "type" : "string"
+            },
+            "product_category" : {
+              "type" : "string"
+            },
+            "seller_id" : {
+              "type" : "string"
+            }
+          }
+        }
+      ContentType: application/json
