@@ -7,15 +7,24 @@ table_name = os.environ.get("ANALYSIS_TABLE_NAME")
 
 
 def lambda_handler(event, context):
-    # create an SQS client
-    sqs = boto3.client("sqs")
+    print(event)
 
-    params = event["queryStringParameters"]
-    print(params)
+    if event["path"] == "/products" and event["httpMethod"] == "PUT":
+        # create an SQS client
+        sqs = boto3.client("sqs")
 
-    body = {}
-    # push a message to the SQS queue
-    sqs.send_message(QueueUrl=queue_url, MessageBody=body)
+        params = json.loads(event["body"])
+
+        body = {
+            "name": params["name"],
+            "link": params["link"],
+            "category": params["category"],
+        }
+
+        # push a message to the SQS queue
+        sqs.send_message(QueueUrl=queue_url, MessageBody=json.dumps(body))
+
+        return {"statusCode": 200, "body": body}
 
     ### dynamodb stuff below ###
 
