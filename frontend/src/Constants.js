@@ -1,0 +1,1 @@
+export const apiGatewayEndpoint = "https://s6bc2bia54.execute-api.us-east-1.amazonaws.com/test-stage";
