@@ -103,114 +103,101 @@ import numpy as np
 
 def lambda_handler(event, context):
     # create a DynamoDB client
-    ses = boto3.client('ses')
+    ses = boto3.client("ses")
     ses_arn = "arn:aws:ses:us-east-1:412391315699:identity/yl4386@columbia.edu"
-    
+
     product_id = "/search?q=hello+world"
-    message = "Your product report is ready. Please view at this link: https://www.google.com" + product_id
-    
-    subject = 'Your Product Report is Ready'
+    message = (
+        "Your product report is ready. Please view at this link: https://www.google.com"
+        + product_id
+    )
+
+    subject = "Your Product Report is Ready"
     body = message
     sender = "yl4386@columbia.edu"
     email = "yl4386@columbia.edu"
     recipients = [email]
 
     emailContent = {
-        'Subject': {'Data': subject},
-        'Body': {'Text': {'Data': body}},
-        'FromEmailAddress': sender,
-        'To': [{'EmailAddress': r} for r in recipients]
+        "Subject": {"Data": subject},
+        "Body": {"Text": {"Data": body}},
+        "FromEmailAddress": sender,
+        "To": [{"EmailAddress": r} for r in recipients],
     }
-    
-    sesClient = boto3.client('ses', region_name= 'us-east-1')
-    
+
+    sesClient = boto3.client("ses", region_name="us-east-1")
+
     response = ses.send_email(
         Source=sender,
-        Destination={
-            "ToAddresses": recipients
-        },
-        Message={
-            "Subject": {
-                "Data": subject
-            },
-            "Body": {
-                "Text": {
-                    "Data": body
-                }
-            }
-        }
+        Destination={"ToAddresses": recipients},
+        Message={"Subject": {"Data": subject}, "Body": {"Text": {"Data": body}}},
     )
-    
+
     return "success"
-    
-    
+
     ######################
     ### MIGRATE TO LF1 ###
     ######################
-    
-    dynamodb = boto3.client('dynamodb')
-    
+
+    dynamodb = boto3.client("dynamodb")
+
     # specify the table name
-    table_name = 'Insights_1'
-    
+    table_name = "Insights_1"
+
     # specify the query parameters
     query_params = {
-        'TableName': table_name,
-        'KeyConditionExpression': 'product_id = :pk',
-        'ExpressionAttributeValues': {
-            ':pk': {'S': 'airpods'}
-        }
+        "TableName": table_name,
+        "KeyConditionExpression": "product_id = :pk",
+        "ExpressionAttributeValues": {":pk": {"S": "airpods"}},
     }
-    
+
     # execute the query
     query_response = dynamodb.query(**query_params)
-    
+
     # return the results
-    data = query_response['Items']
-    
+    data = query_response["Items"]
+
     ret = []
-    
+
     for r in data:
-        if r['insight_name']['S'] == 'average_stars_over_time':
+        if r["insight_name"]["S"] == "average_stars_over_time":
             dictionary = {}
             dvalue = {}
-            jd = json.loads(r['data']['S'])
-            #return jd['stars']
-            for i in range(len(jd['stars'])):
-                dvalue[jd['dates'][i]] = jd['stars'][i]
-            
-            dictionary['average_stars_over_time'] = dvalue
+            jd = json.loads(r["data"]["S"])
+            # return jd['stars']
+            for i in range(len(jd["stars"])):
+                dvalue[jd["dates"][i]] = jd["stars"][i]
+
+            dictionary["average_stars_over_time"] = dvalue
             ret.append(dictionary)
-            
-        if r['insight_name']['S'] == 'average_stars_per_category':
+
+        if r["insight_name"]["S"] == "average_stars_per_category":
             dictionary = {}
-            jd = json.loads(r['data']['S'])
-            dictionary['average_stars_per_category'] = jd
+            jd = json.loads(r["data"]["S"])
+            dictionary["average_stars_per_category"] = jd
             ret.append(dictionary)
-            
-        if r['insight_name']['S'] == 'sentiments_over_time':
-            dictionary = {}
-            dvalue = {}
-            jd = json.loads(r['data']['S'])
-            for i in range(len(jd['positive'])):
-                dvalue[jd['dates'][i]] = jd['positive'][i]
-            
-            dictionary['sentiments_over_time_positive'] = dvalue
-            ret.append(dictionary)
-    
+
+        if r["insight_name"]["S"] == "sentiments_over_time":
             dictionary = {}
             dvalue = {}
-            jd = json.loads(r['data']['S'])
-            for i in range(len(jd['negative'])):
-                dvalue[jd['dates'][i]] = jd['negative'][i]
-            
-            dictionary['sentiments_over_time_negative'] = dvalue
+            jd = json.loads(r["data"]["S"])
+            for i in range(len(jd["positive"])):
+                dvalue[jd["dates"][i]] = jd["positive"][i]
+
+            dictionary["sentiments_over_time_positive"] = dvalue
             ret.append(dictionary)
-    
+
+            dictionary = {}
+            dvalue = {}
+            jd = json.loads(r["data"]["S"])
+            for i in range(len(jd["negative"])):
+                dvalue[jd["dates"][i]] = jd["negative"][i]
+
+            dictionary["sentiments_over_time_negative"] = dvalue
+            ret.append(dictionary)
+
     return ret
-    
-    
-    
+
     # data = [['Sulfate', 'Nitrate', 'EC', 'OC1', 'OC2', 'OC3', 'OP', 'CO', 'O3'],
     #     ('Basecase', [
     #         [0.88, 0.01, 0.03, 0.03, 0.00, 0.06, 0.01, 0.00, 0.00],
@@ -221,19 +208,19 @@ def lambda_handler(event, context):
 
     # N = len(data[0])
     # theta = radar_factory(N, frame='polygon')
-    
+
     # spoke_labels = data.pop(0)
     # title, case_data = data[0]
-    
+
     # fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(projection='radar'))
     # fig.subplots_adjust(top=0.85, bottom=0.05)
-    
+
     # ax.set_rgrids([0.2, 0.4, 0.6, 0.8])
     # ax.set_title(title,  position=(0.5, 1.1), ha='center')
-    
+
     # for d in case_data:
     #     line = ax.plot(theta, d)
     #     ax.fill(theta, d,  alpha=0.25)
     # ax.set_varlabels(spoke_labels)
-    
+
     # plt.show()
