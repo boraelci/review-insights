@@ -7,6 +7,10 @@ Parameters:
     Type: String
     Default: frontend-lambda
 
+  GatherInsightsLambdaName:
+    Type: String
+    Default: gather-insights-lambda
+
   GatherReviewsLambdaName:
     Type: String
     Default: gather-reviews-lambda
@@ -28,6 +32,7 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
 
   FrontendLambda:
     Type: AWS::Lambda::Function
@@ -35,25 +40,71 @@ Resources:
       Environment:
         Variables:
           ENV: prod
+          AWS_ACCOUNT_ID: !Ref AWS::AccountId
       FunctionName: !Ref FrontendLambdaName
       Handler: main.lambda_handler
-      Runtime: python3.8
+      Runtime: python3.9
       Role: !GetAtt FrontendLambdaRole.Arn
       Architectures:
         - x86_64
       Code:
-        ZipFile: >
-          def lambda_handler(event, context):
-            return {
-              'statusCode': 200,
-              'body': 'Hello from Lambda!',
-              'headers': {
-                'Content-Type': 'text/plain',
-                'Access-Control-Allow-Origin': '*'
-              }
-            }
-      MemorySize: 128
-      Timeout: 3
+        S3Bucket: !Ref ArtifactsBucketName
+        S3Key: !Sub ${FrontendLambdaName}/lambda_function.zip
+      MemorySize: 1024
+      Timeout: 120
+      EphemeralStorage:
+        Size: 512
+
+  FrontendDynamoDB:
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      AttributeDefinitions: 
+        - AttributeName: product_id
+          AttributeType: S
+        - AttributeName: insight_name
+          AttributeType: S
+        - AttributeName: data
+          AttributeType: S
+      KeySchema: 
+        - AttributeName: product_id
+          KeyType: HASH
+        - AttributeName: insight_name
+          KeyType: RANGE
+      TableName: 'Insights_1'
+
+  GenerateReportLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonSESFullAccess
+        - arn:aws:lambda:us-east-1:336392948345:layer:AWSSDKPandas-Python39:5
+
+  GenerateReportLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Environment:
+        Variables:
+          ENV: prod
+          AWS_ACCOUNT_ID: !Ref AWS::AccountId
+      FunctionName: !Ref GenerateReportLambdaName
+      Handler: main.lambda_handler
+      Runtime: python3.9
+      Role: !GetAtt GenerateReportLambdaRole.Arn
+      Architectures:
+        - x86_64
+      Code:
+        S3Bucket: !Ref ArtifactsBucketName
+        S3Key: !Sub ${GenerateReportLambdaName}/lambda_function.zip
+      MemorySize: 1024
+      Timeout: 120
       EphemeralStorage:
         Size: 512
 
