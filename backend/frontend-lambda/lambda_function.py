@@ -1,30 +1,25 @@
 import json
 import boto3
 import os
+import uuid
 
 queue_url = os.environ.get("GATHER_REVIEWS_QUEUE_URL")
 table_name = os.environ.get("ANALYSIS_TABLE_NAME")
 
-
 def lambda_handler(event, context):
-    print(event)
-
-    if event["path"] == "/products" and event["httpMethod"] == "PUT":
+    if "link" in event:
         # create an SQS client
-        sqs = boto3.client("sqs")
+        sqs = boto3.client('sqs')
 
-        params = json.loads(event["body"])
+        queue_url = "https://sqs.us-east-1.amazonaws.com/412391315699/GatherReviewsOrder"
+        id = uuid.uuid4()
 
         body = {
-            "name": params["name"],
-            "link": params["link"],
-            "category": params["category"],
+            "id": str(id),
+            "name": event["name"],
+            "link": event["link"],
+            "category": event["category"]
         }
-
-        # push a message to the SQS queue
-        sqs.send_message(QueueUrl=queue_url, MessageBody=json.dumps(body))
-
-        return {"statusCode": 200, "body": body}
 
     ### dynamodb stuff below ###
 
