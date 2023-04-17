@@ -3,7 +3,7 @@ import json
 import os
 
 env = os.environ.get("ENV", default="dev")
-bucket_name = f"reviews-{os.environ.get('AWS_ACCOUNT_ID')}"
+bucket_name = os.environ.get("REVIEWS_BUCKET_NAME")
 
 
 def lambda_handler(event, context):

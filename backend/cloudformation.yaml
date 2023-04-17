@@ -3,9 +3,21 @@ Parameters:
     Type: String
     Default: artifacts-412391315699
 
+  ReviewsBucketName:
+    Type: String
+    Default: reviews-412391315699
+
+  AnalysisTableName:
+    Type: String
+    Default: analysis-table
+
   FrontendLambdaName:
     Type: String
     Default: frontend-lambda
+
+  ExtractInsightsLambdaName:
+    Type: String
+    Default: extract-insights-lambda
 
   GatherReviewsLambdaName:
     Type: String
@@ -28,6 +40,7 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
 
   FrontendLambda:
     Type: AWS::Lambda::Function
@@ -35,25 +48,71 @@ Resources:
       Environment:
         Variables:
           ENV: prod
+          GATHER_REVIEWS_QUEUE_URL: !GetAtt GatherReviewsQueue.QueueUrl
+          ANALYSIS_TABLE_NAME: !Ref AnalysisTableName
       FunctionName: !Ref FrontendLambdaName
       Handler: main.lambda_handler
-      Runtime: python3.8
+      Runtime: python3.9
       Role: !GetAtt FrontendLambdaRole.Arn
       Architectures:
         - x86_64
       Code:
-        ZipFile: >
-          def lambda_handler(event, context):
-            return {
-              'statusCode': 200,
-              'body': 'Hello from Lambda!',
-              'headers': {
-                'Content-Type': 'text/plain',
-                'Access-Control-Allow-Origin': '*'
-              }
-            }
-      MemorySize: 128
-      Timeout: 3
+        S3Bucket: !Ref ArtifactsBucketName
+        S3Key: !Sub ${FrontendLambdaName}/lambda_function.zip
+      MemorySize: 1024
+      Timeout: 120
+      EphemeralStorage:
+        Size: 512
+
+  AnalysisTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: product_id
+          AttributeType: S
+        - AttributeName: insight_name
+          AttributeType: S
+        - AttributeName: data
+          AttributeType: S
+      KeySchema:
+        - AttributeName: product_id
+          KeyType: HASH
+        - AttributeName: insight_name
+          KeyType: RANGE
+      TableName: !Ref AnalysisTableName
+
+  GenerateReportLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonSESFullAccess
+        - arn:aws:lambda:us-east-1:336392948345:layer:AWSSDKPandas-Python39:5
+
+  GenerateReportLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Environment:
+        Variables:
+          ENV: prod
+      FunctionName: !Ref GenerateReportLambdaName
+      Handler: main.lambda_handler
+      Runtime: python3.9
+      Role: !GetAtt GenerateReportLambdaRole.Arn
+      Architectures:
+        - x86_64
+      Code:
+        S3Bucket: !Ref ArtifactsBucketName
+        S3Key: !Sub ${GenerateReportLambdaName}/lambda_function.zip
+      MemorySize: 1024
+      Timeout: 120
       EphemeralStorage:
         Size: 512
 
@@ -123,16 +182,16 @@ Resources:
     Type: AWS::ApiGateway::RestApi
     Properties:
       Name: Review Insights2
-      ApiKeySourceType: "HEADER"
+      ApiKeySourceType: HEADER
       EndpointConfiguration:
         Types:
-          - "REGIONAL"
+          - REGIONAL
 
   ApiGatewayDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
-      - "ProductsOptionsMethod"
-      - "ProductsPostMethod"
+      - ProductsOptionsMethod
+      - ProductsPostMethod
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
       StageName: prod
@@ -163,14 +222,14 @@ Resources:
       Integration:
         IntegrationResponses:
           - ResponseParameters:
-              "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              "method.response.header.Access-Control-Allow-Methods": "'GET,OPTIONS'"
-              "method.response.header.Access-Control-Allow-Origin": "'*'"
-            StatusCode: "200"
-        PassthroughBehavior: "WHEN_NO_MATCH"
+              method.response.header.Access-Control-Allow-Headers: "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token"
+              method.response.header.Access-Control-Allow-Methods: "GET,OPTIONS"
+              method.response.header.Access-Control-Allow-Origin: "*"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
-          "application/json": '{"statusCode": 200}'
-        Type: "MOCK"
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
 
   ProductsPostMethod:
     DependsOn:
@@ -190,13 +249,13 @@ Resources:
             method.response.header.Access-Control-Allow-Origin: false
           StatusCode: 200
       Integration:
-        ContentHandling: "CONVERT_TO_TEXT"
-        IntegrationHttpMethod: "POST"
+        ContentHandling: CONVERT_TO_TEXT
+        IntegrationHttpMethod: POST
         IntegrationResponses:
           - ResponseParameters:
-              "method.response.header.Access-Control-Allow-Origin": "'*'"
-            StatusCode: "200"
-        PassthroughBehavior: "WHEN_NO_TEMPLATES"
+              method.response.header.Access-Control-Allow-Origin: "*"
+            StatusCode: 200
+        PassthroughBehavior: WHEN_NO_TEMPLATES
         RequestTemplates:
           "application/json": |
             {
@@ -204,8 +263,8 @@ Resources:
                 "link": "$input.params('link')",
                 "category": "$input.params('category')"
             }
-        Type: "AWS"
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FrontendLambdaName}/invocations"
+        Type: AWS
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FrontendLambdaName}/invocations
 
   SellerModel:
     Type: AWS::ApiGateway::Model
