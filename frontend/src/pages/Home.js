@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import {v4 as uuidv4} from 'uuid';
 import '../App.css';
 import {apiGatewayEndpoint} from "../Constants.js"
 
@@ -32,10 +31,6 @@ export function Home() {
         "name": name,
         "link": link,
         "category": type}),
-
-      headers: {
-      "Content-Type": "text/plain"
-      }
 
     })
       .then(response => response.json())
