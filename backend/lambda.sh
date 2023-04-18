@@ -18,7 +18,7 @@ uploadLambda() {
 	cd ..
 	aws s3 cp tmp/$lambda.zip s3://$ARTIFACTS_BUCKET_NAME/$lambda/lambda_function.zip
 
-	if [ $update ]; then
+	if [ "$update" == "y" ]; then
 		aws lambda update-function-code \
 		--function-name $lambda \
 		--s3-bucket $ARTIFACTS_BUCKET_NAME \
@@ -32,9 +32,9 @@ if [ -z "$1" ]; then
 fi
 
 if [ "$2" == "n" ]; then
-	update=false
+	update=n
 else
-	update=true
+	update=y
 fi
 
 rm -rf tmp
@@ -47,12 +47,12 @@ elif [ "$1" == "2" ]; then
 elif [ "$1" == "3" ]; then
     uploadLambda $EXTRACT_INSIGHTS_LAMBDA $update
 elif [ "$1" == "4" ]; then
-    uploadLambda $GENERATE_REPORTS_LAMBDA $update
+    uploadLambda $GENERATE_REPORT_LAMBDA $update
 elif [ "$1" == "a" ]; then
     uploadLambda $FRONTEND_LAMBDA $update
     uploadLambda $GATHER_REVIEWS_LAMBDA $update
 		uploadLambda $EXTRACT_INSIGHTS_LAMBDA $update
-	  uploadLambda $GENERATE_REPORTS_LAMBDA $update
+	  uploadLambda $GENERATE_REPORT_LAMBDA $update
 else
   echo -e "Error: Invalid argument. $ERROR_MESSAGE"
 	exit 1

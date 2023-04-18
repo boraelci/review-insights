@@ -12,48 +12,80 @@ show_graphs = False
 if show_graphs:
     import matplotlib.pyplot as plt
 # Initialize AWS services
-sagemaker = boto3.client("sagemaker-runtime")
+# sagemaker = boto3.client("sagemaker-runtime")
 comprehend = boto3.client("comprehend")
-rekognition = boto3.client("rekognition")
-translate = boto3.client("translate")
+# rekognition = boto3.client("rekognition")
+# translate = boto3.client("translate")
 s3 = boto3.client("s3")
 visualize_bucket = "project-visualized-images"
 
 
-class Analyzer:
-    def __init__(self):
-        pass
+def round_float(number):
+    """
+    Round a float to two decimal places.
+    """
+    return round(number, 2)
 
-    def get_text_sentiment(text):
+
+class Analyzer:
+    def __init__(self, table_name, queue_url):
+        self.table_name = table_name
+        self.queue_url = queue_url
+
+    def get_text_sentiment(self, text):
         response = comprehend.detect_sentiment(Text=text, LanguageCode="en")
         return response["Sentiment"]
 
-    def translate_text(text, target_language):
+    def translate_text(self, text, target_language):
         response = translate.translate_text(
             Text=text, SourceLanguageCode="en", TargetLanguageCode=target_language
         )
         return response["TranslatedText"]
 
-    def run(event):
+    def run(self, key, reviews):
+        avg_stars = self.average_stars(reviews)
+        sentiments = self.analyze_sentiments(reviews)
+        avg_stars_category = self.categorize_reviews(reviews)
+
+        # Create DynamoDB client and table resource objects
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(self.table_name)
+
+        # Add data to DynamoDB
+        key = key.replace(".csv", "")
+        table.put_item(
+            Item={
+                "product_id": key,
+                "insight_name": "average_stars_over_time",
+                "data": json.dumps(avg_stars),
+            }
+        )
+        table.put_item(
+            Item={
+                "product_id": key,
+                "insight_name": "sentiments_over_time",
+                "data": json.dumps(sentiments),
+            }
+        )
+        table.put_item(
+            Item={
+                "product_id": key,
+                "insight_name": "average_stars_per_category",
+                "data": json.dumps(avg_stars_category),
+            }
+        )
+
         return {
             "body": {
                 "insights": [
-                    {"average_stars_over_time": json.dumps(average_stars(csv_content))},
-                    {
-                        "sentiments_over_time": json.dumps(
-                            analyze_sentiments(csv_content)
-                        )
-                    },
-                    {
-                        "average_stars_per_category": json.dumps(
-                            categorize_reviews(csv_content)
-                        )
-                    },
+                    {"average_stars_over_time": json.dumps(avg_stars)},
+                    {"sentiments_over_time": json.dumps(sentiments)},
+                    {"average_stars_per_category": json.dumps(avg_stars_category)},
                 ]
             }
         }
 
-    def average_stars(csv_content):
+    def average_stars(self, csv_content):
         # Parse CSV content
         data = []
         reader = csv.DictReader(csv_content.splitlines())
@@ -78,7 +110,9 @@ class Analyzer:
         avg_stars = []
         for date, star_data in date_stars.items():
             dates.append(str(date))
-            avg_stars.append(sum(star_data["stars"]) / len(star_data["stars"]))
+            avg_stars.append(
+                round_float(sum(star_data["stars"]) / len(star_data["stars"]))
+            )
 
         if show_graphs:
             # Create plot using Matplotlib
@@ -90,7 +124,7 @@ class Analyzer:
 
         return {"stars": avg_stars, "dates": dates}
 
-    def analyze_sentiments(csv_content):
+    def analyze_sentiments(self, csv_content):
         comprehend = boto3.client("comprehend")
         reader = csv.DictReader(csv_content.splitlines())
         reviews = []
@@ -150,8 +184,12 @@ class Analyzer:
         avg_pos_sentiments = []
         avg_neg_sentiments = []
         for date, sentiments in sentiments_by_date.items():
-            avg_pos_sentiments.append(sentiments["positive"] / sentiments["count"])
-            avg_neg_sentiments.append(sentiments["negative"] / sentiments["count"])
+            avg_pos_sentiments.append(
+                round_float(sentiments["positive"] / sentiments["count"])
+            )
+            avg_neg_sentiments.append(
+                round_float(sentiments["negative"] / sentiments["count"])
+            )
 
         if show_graphs:
             # Create a graph with two plots - negative sentiments and positive sentiments over time
@@ -177,7 +215,7 @@ class Analyzer:
             "dates": [str(date) for date in list(sentiments_by_date.keys())],
         }
 
-    def categorize_reviews(csv_content):
+    def categorize_reviews(self, csv_content):
         # Define the categories and the keywords that belong to each category
         categories = {
             "cost": ["cost", "price", "expensive", "affordable", "inexpensive"],
@@ -223,7 +261,9 @@ class Analyzer:
 
         # Compute the average rating for each category
         avg_stars_per_category = {
-            category: stars_per_category[category] / num_reviews_per_category[category]
+            category: round_float(
+                stars_per_category[category] / num_reviews_per_category[category]
+            )
             for category in categories
             if num_reviews_per_category[category] > 0
         }

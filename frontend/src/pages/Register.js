@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import '../App.css';
-import {apiGatewayEndpoint} from "../Constants.js"
+import {API_GATEWAY_ENDPOINT} from "../Config"
 import Masthead from "../components/Masthead.js"
 
 export function Register() {
@@ -26,13 +26,15 @@ export function Register() {
     event.preventDefault();
 
     // Call the API Gateway API with the product ID
-    fetch(`${apiGatewayEndpoint}/products`, {
-      method: "PUT",
+    fetch(`${API_GATEWAY_ENDPOINT}/products`, {
+      method: "POST",
       body: JSON.stringify({
-        "name": name,
-        "link": link,
-        "category": type}),
-
+        "product_name": name,
+        "product_link": link,
+        "product_category": type}),
+      headers: {
+        "Content-Type": "application/json"
+      }
     })
       .then(response => response.json())
       .then(data => {

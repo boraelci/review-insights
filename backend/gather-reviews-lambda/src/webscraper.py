@@ -11,7 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 
 class WebScraper:
-    def __init__(self, env):
+    def __init__(self, env, queue_url):
         self.env = env
         self.s3 = boto3.client("s3")
 
@@ -24,7 +24,7 @@ class WebScraper:
                 "--no-sandbox",
             ]
             self.driver = create_driver(new_params)
-            print("driver created")
+            print("Init complete")
 
     def run(self, original_url, number_pages):
         driver = self.driver
@@ -69,7 +69,7 @@ class WebScraper:
                 break
 
             reviews = driver.find_elements(By.CSS_SELECTOR, "div[data-hook='review']")
-            for i, r in enumerate(reviews):
+            for r in reviews:
                 date_span = r.find_element(
                     By.CSS_SELECTOR, "span[data-hook='review-date']"
                 )
@@ -88,7 +88,7 @@ class WebScraper:
                     By.CSS_SELECTOR, "a[data-hook='review-title']"
                 ).text
                 title = title_a.replace("\n", "")
-                review_list.append((i, date, stars, title, review))
+                review_list.append([date, stars, title, review])
 
             amazon_reviews += review_list
             page += 1
@@ -109,6 +109,11 @@ class WebScraper:
             csv_buffer = StringIO()
             writer = csv.writer(csv_buffer)
             writer.writerow(["Index", "Date", "Stars", "Title", "Review"])
-            writer.writerows(reviews)
+            index = 0
+            for review in reviews:
+                review.insert(0, index)
+                writer.writerow(review)
+                index += 1
+
             csv_buffer.seek(0)
             s3.put_object(Bucket=bucket_name, Key=file_path, Body=csv_buffer.getvalue())
