@@ -25,13 +25,34 @@ Parameters:
 
   GenerateReportLambdaName:
     Type: String
-    Default: extract-insights-lambda
+    Default: generate-report-lambda
 
   GatherReviewsQueueName:
     Type: String
     Default: gather-reviews-queue
 
+  ExtractInsightsQueueName:
+    Type: String
+    Default: extract-insights-queue
+
+  GenerateReportQueueName:
+    Type: String
+    Default: generate-report-queue
+
 Resources:
+  ReviewsBucket:
+    DependsOn: ExtractInsightsLambda
+    Type: "AWS::S3::Bucket"
+    DeletionPolicy: Delete
+    Properties:
+      AccessControl: Private
+      BucketName: !Ref ReviewsBucketName
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
   FrontendLambdaRole:
     Type: AWS::IAM::Role
     Properties:
@@ -64,60 +85,8 @@ Resources:
       Code:
         S3Bucket: !Ref ArtifactsBucketName
         S3Key: !Sub ${FrontendLambdaName}/lambda_function.zip
-      MemorySize: 1024
-      Timeout: 120
-      EphemeralStorage:
-        Size: 512
-
-  AnalysisTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      AttributeDefinitions:
-        - AttributeName: product_id
-          AttributeType: S
-        - AttributeName: insight_name
-          AttributeType: S
-      KeySchema:
-        - AttributeName: product_id
-          KeyType: HASH
-        - AttributeName: insight_name
-          KeyType: RANGE
-      TableName: !Ref AnalysisTableName
-      BillingMode: PAY_PER_REQUEST
-
-  GenerateReportLambdaRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: 2012-10-17
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-        - arn:aws:iam::aws:policy/AmazonSESFullAccess
-
-  GenerateReportLambda:
-    Type: AWS::Lambda::Function
-    Properties:
-      Environment:
-        Variables:
-          ENV: prod
-      FunctionName: !Ref GenerateReportLambdaName
-      Handler: main.lambda_handler
-      Runtime: python3.9
-      Role: !GetAtt GenerateReportLambdaRole.Arn
-      Layers:
-        - arn:aws:lambda:us-east-1:336392948345:layer:AWSSDKPandas-Python39:5
-      Architectures:
-        - x86_64
-      Code:
-        S3Bucket: !Ref ArtifactsBucketName
-        S3Key: !Sub ${GenerateReportLambdaName}/lambda_function.zip
-      MemorySize: 1024
-      Timeout: 120
+      MemorySize: 128
+      Timeout: 3
       EphemeralStorage:
         Size: 512
 
@@ -152,7 +121,8 @@ Resources:
       Environment:
         Variables:
           ENV: prod
-          AWS_ACCOUNT_ID: !Ref AWS::AccountId
+          REVIEWS_BUCKET_NAME: !Ref ReviewsBucketName
+          EXTRACT_INSIGHTS_QUEUE_URL: !GetAtt ExtractInsightsQueue.QueueUrl
       FunctionName: !Ref GatherReviewsLambdaName
       Handler: main.lambda_handler
       Runtime: python3.8
@@ -166,6 +136,83 @@ Resources:
         S3Key: !Sub ${GatherReviewsLambdaName}/lambda_function.zip
       MemorySize: 1024
       Timeout: 120
+      EphemeralStorage:
+        Size: 512
+
+  ExtractInsightsLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/ComprehendFullAccess
+        - arn:aws:iam::aws:policy/AmazonSQSFullAccess
+
+  ExtractInsightsLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Environment:
+        Variables:
+          ENV: prod
+          REVIEWS_BUCKET_NAME: !Ref ReviewsBucketName
+          GENERATE_REPORT_QUEUE_URL: !GetAtt GenerateReportQueue.QueueUrl
+          ANALYSIS_TABLE_NAME: !Ref AnalysisTableName
+      FunctionName: !Ref ExtractInsightsLambdaName
+      Handler: main.lambda_handler
+      Runtime: python3.9
+      Role: !GetAtt ExtractInsightsLambdaRole.Arn
+      Architectures:
+        - x86_64
+      Code:
+        S3Bucket: !Ref ArtifactsBucketName
+        S3Key: !Sub ${ExtractInsightsLambdaName}/lambda_function.zip
+      MemorySize: 128
+      Timeout: 120
+      EphemeralStorage:
+        Size: 512
+
+  GenerateReportLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonSESFullAccess
+        - arn:aws:iam::aws:policy/AmazonSQSFullAccess
+
+  GenerateReportLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Environment:
+        Variables:
+          ENV: prod
+      FunctionName: !Ref GenerateReportLambdaName
+      Handler: main.lambda_handler
+      Runtime: python3.9
+      Role: !GetAtt GenerateReportLambdaRole.Arn
+      Layers:
+        - arn:aws:lambda:us-east-1:336392948345:layer:AWSSDKPandas-Python39:5
+      Architectures:
+        - x86_64
+      Code:
+        S3Bucket: !Ref ArtifactsBucketName
+        S3Key: !Sub ${GenerateReportLambdaName}/lambda_function.zip
+      MemorySize: 128
+      Timeout: 3
       EphemeralStorage:
         Size: 512
 
@@ -183,6 +230,50 @@ Resources:
       EventSourceArn: !GetAtt GatherReviewsQueue.Arn
       FunctionName: !Ref GatherReviewsLambda
 
+  ExtractInsightsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Ref ExtractInsightsQueueName
+      VisibilityTimeout: 120
+
+  ExtractInsightsLambdaSQSTrigger:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 1
+      Enabled: true
+      EventSourceArn: !GetAtt ExtractInsightsQueue.Arn
+      FunctionName: !Ref ExtractInsightsLambda
+
+  GenerateReportQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Ref GenerateReportQueueName
+      VisibilityTimeout: 120
+
+  GenerateReportLambdaSQSTrigger:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 1
+      Enabled: true
+      EventSourceArn: !GetAtt GenerateReportQueue.Arn
+      FunctionName: !Ref GenerateReportLambda
+
+  AnalysisTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: product_id
+          AttributeType: S
+        - AttributeName: insight_name
+          AttributeType: S
+      KeySchema:
+        - AttributeName: product_id
+          KeyType: HASH
+        - AttributeName: insight_name
+          KeyType: RANGE
+      TableName: !Ref AnalysisTableName
+      BillingMode: PAY_PER_REQUEST
+
   ApiGatewayRestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
@@ -191,6 +282,14 @@ Resources:
       EndpointConfiguration:
         Types:
           - REGIONAL
+
+  ApiGatewayFrontendLambdaPermission:
+    DependsOn: FrontendLambda
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref FrontendLambdaName
+      Principal: apigateway.amazonaws.com
 
   ApiGatewayDeployment:
     Type: AWS::ApiGateway::Deployment
@@ -238,7 +337,7 @@ Resources:
               method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
             StatusCode: 200
-        PassthroughBehavior: WHEN_NO_MATCH
+        PassthroughBehavior: NEVER
         RequestTemplates:
           application/json: '{"statusCode": 200}'
         Type: MOCK
@@ -255,7 +354,7 @@ Resources:
       OperationName: CreateProduct
       RequestParameters: {}
       RequestModels:
-        "application/json": "ProductModel"
+        application/json: "ProductModel"
       MethodResponses:
         - ResponseParameters:
             method.response.header.Access-Control-Allow-Headers: false
@@ -267,11 +366,18 @@ Resources:
         IntegrationHttpMethod: POST
         IntegrationResponses:
           - ResponseParameters:
-              "method.response.header.Access-Control-Allow-Origin": "'*'"
-            StatusCode: "200"
-        PassthroughBehavior: "WHEN_NO_TEMPLATES"
-        Type: "AWS"
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FrontendLambdaName}/invocations"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: NEVER
+        RequestTemplates:
+          application/json: |
+            {
+              "resourcePath": "$context.resourcePath",
+              "httpMethod": "$context.httpMethod",
+              "body": $input.json('$')
+            }
+        Type: AWS
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FrontendLambdaName}/invocations
 
   AnalysisOptionsMethod:
     DependsOn:
@@ -295,11 +401,11 @@ Resources:
               method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
               method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
               method.response.header.Access-Control-Allow-Origin: "'*'"
-            StatusCode: "200"
-        PassthroughBehavior: "WHEN_NO_MATCH"
+            StatusCode: 200
+        PassthroughBehavior: NEVER
         RequestTemplates:
-          "application/json": '{"statusCode": 200}'
-        Type: "MOCK"
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
 
   AnalysisGetMethod:
     DependsOn:
@@ -321,15 +427,15 @@ Resources:
             method.response.header.Access-Control-Allow-Origin: false
           StatusCode: 200
       Integration:
-        ContentHandling: "CONVERT_TO_TEXT"
-        IntegrationHttpMethod: "POST"
+        ContentHandling: CONVERT_TO_TEXT
+        IntegrationHttpMethod: POST
         IntegrationResponses:
           - ResponseParameters:
-              "method.response.header.Access-Control-Allow-Origin": "'*'"
-            StatusCode: "200"
-        PassthroughBehavior: "WHEN_NO_TEMPLATES"
-        Type: "AWS"
-        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FrontendLambdaName}/invocations"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: NEVER
+        Type: AWS
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FrontendLambdaName}/invocations
 
   SellerModel:
     Type: AWS::ApiGateway::Model
@@ -382,6 +488,7 @@ Resources:
     Type: AWS::ApiGateway::Model
     DependsOn:
       - HistoricalDataModel
+      - CategoricalDataModel
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
       Name: AnalysisModel
