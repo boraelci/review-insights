@@ -11,9 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 
 class WebScraper:
-    def __init__(self, original_url, env):
-        self.original_url = original_url
-        self.number_pages = 1
+    def __init__(self, env):
         self.env = env
         self.s3 = boto3.client("s3")
 
@@ -28,15 +26,13 @@ class WebScraper:
             self.driver = create_driver(new_params)
             print("driver created")
 
-    def run(self):
+    def run(self, original_url, number_pages):
         driver = self.driver
-        original_url = self.original_url
-        number_pages = self.number_pages
 
         if original_url == "auto":
             # original_url = "https://www.amazon.com/Apple-AirPods-Charging-Latest-Model/dp/B07PXGQC1Q/ref=sr_1_1_sspa?dchild=1&keywords=airpods&qid=1610226273&sr=8-1-spons&psc=1&spLa=ZW5jcnlwdGVkUXVhbGlmaWVyPUFVNkIyMEFDM0NEWkEmZW5jcnlwdGVkSWQ9QTA0NDI5MDgyVkZDOVNMVUtIUUdaJmVuY3J5cHRlZEFkSWQ9QTAzMDg3NzMyQzIzWFNBVjJGMUxXJndpZGdldE5hbWU9c3BfYXRmJmFjdGlvbj1jbGlja1JlZGlyZWN0JmRvTm90TG9nQ2xpY2s9dHJ1ZQ=="
             original_url = "https://www.amazon.com/Tide-Febreze-Defense-Detergent-Packaging/dp/B01BZQJLFW/ref=asc_df_B01BZQJLFW/?tag=hyprod-20&linkCode=df0&hvadid=309832782859&hvpos=&hvnetw=g&hvrand=14385160540479028809&hvpone=&hvptwo=&hvqmt=&hvdev=c&hvdvcmdl=&hvlocint=&hvlocphy=9073502&hvtargid=pla-425063129473&psc=1&tag=&ref=&adgrpid=70155173188&hvpone=&hvptwo=&hvadid=309832782859&hvpos=&hvnetw=g&hvrand=14385160540479028809&hvqmt=&hvdev=c&hvdvcmdl=&hvlocint=&hvlocphy=9073502&hvtargid=pla-425063129473"
-        number_pages = 2  # 100 pages = 950 almost 1000 reviews
+        # number of pages: 100 pages = 950 almost 1000 reviews
 
         driver.get(original_url)
         # img_div = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.CLASS_NAME, "imgTagWrapper")))

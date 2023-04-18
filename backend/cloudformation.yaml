@@ -15,13 +15,17 @@ Parameters:
     Type: String
     Default: frontend-lambda
 
+  GatherReviewsLambdaName:
+    Type: String
+    Default: gather-reviews-lambda
+
   ExtractInsightsLambdaName:
     Type: String
     Default: extract-insights-lambda
 
-  GatherReviewsLambdaName:
+  GenerateReportLambdaName:
     Type: String
-    Default: gather-reviews-lambda
+    Default: extract-insights-lambda
 
   GatherReviewsQueueName:
     Type: String
@@ -41,6 +45,7 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/AmazonSQSFullAccess
 
   FrontendLambda:
     Type: AWS::Lambda::Function
@@ -72,14 +77,13 @@ Resources:
           AttributeType: S
         - AttributeName: insight_name
           AttributeType: S
-        - AttributeName: data
-          AttributeType: S
       KeySchema:
         - AttributeName: product_id
           KeyType: HASH
         - AttributeName: insight_name
           KeyType: RANGE
       TableName: !Ref AnalysisTableName
+      BillingMode: PAY_PER_REQUEST
 
   GenerateReportLambdaRole:
     Type: AWS::IAM::Role
@@ -94,7 +98,6 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/AmazonSESFullAccess
-        - arn:aws:lambda:us-east-1:336392948345:layer:AWSSDKPandas-Python39:5
 
   GenerateReportLambda:
     Type: AWS::Lambda::Function
@@ -106,6 +109,8 @@ Resources:
       Handler: main.lambda_handler
       Runtime: python3.9
       Role: !GetAtt GenerateReportLambdaRole.Arn
+      Layers:
+        - arn:aws:lambda:us-east-1:336392948345:layer:AWSSDKPandas-Python39:5
       Architectures:
         - x86_64
       Code:
@@ -190,8 +195,8 @@ Resources:
   ApiGatewayDeployment:
     Type: AWS::ApiGateway::Deployment
     DependsOn:
-      - ProductsOptionsMethod
-      - ProductsPostMethod
+      - ProductOptionsMethod
+      - ProductPostMethod
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
       StageName: prod
@@ -229,9 +234,9 @@ Resources:
       Integration:
         IntegrationResponses:
           - ResponseParameters:
-              method.response.header.Access-Control-Allow-Headers: "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token"
-              method.response.header.Access-Control-Allow-Methods: "GET,OPTIONS"
-              method.response.header.Access-Control-Allow-Origin: "*"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
             StatusCode: 200
         PassthroughBehavior: WHEN_NO_MATCH
         RequestTemplates:
@@ -287,9 +292,9 @@ Resources:
       Integration:
         IntegrationResponses:
           - ResponseParameters:
-              "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-              "method.response.header.Access-Control-Allow-Methods": "'GET,OPTIONS'"
-              "method.response.header.Access-Control-Allow-Origin": "'*'"
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
             StatusCode: "200"
         PassthroughBehavior: "WHEN_NO_MATCH"
         RequestTemplates:

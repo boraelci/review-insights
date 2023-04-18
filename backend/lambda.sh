@@ -22,7 +22,7 @@ uploadLambda() {
 		aws lambda update-function-code \
 		--function-name $lambda \
 		--s3-bucket $ARTIFACTS_BUCKET_NAME \
-		--s3-key $lambda/lambda_function.zip
+		--s3-key $lambda/lambda_function.zip > lambda.out
 	fi
 }
 
