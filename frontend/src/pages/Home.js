@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import '../App.css';
-import {Container, Row, Col} from 'react-bootstrap';
 import {apiGatewayEndpoint} from "../Constants.js"
 import { useNavigate } from 'react-router-dom';
 import Masthead from "../components/Masthead.js"
