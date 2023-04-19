@@ -277,7 +277,7 @@ Resources:
   ApiGatewayRestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
-      Name: Review Insights2
+      Name: Review Insights
       ApiKeySourceType: HEADER
       EndpointConfiguration:
         Types:
@@ -313,6 +313,13 @@ Resources:
       RestApiId: !Ref ApiGatewayRestApi
       PathPart: analyses
       ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+
+  AnalysisByIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      PathPart: "{product-id}"
+      ParentId: !Ref AnalysisResource
 
   ProductOptionsMethod:
     DependsOn:
@@ -413,8 +420,8 @@ Resources:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
-      ResourceId: !Ref AnalysisResource
-      HttpMethod: POST
+      ResourceId: !Ref AnalysisByIdResource
+      HttpMethod: GET
       AuthorizationType: NONE
       OperationName: GetAnalysis
       RequestParameters: {}
@@ -434,6 +441,13 @@ Resources:
               method.response.header.Access-Control-Allow-Origin: "'*'"
             StatusCode: 200
         PassthroughBehavior: NEVER
+        RequestTemplates:
+          application/json: |
+            {
+              "resourcePath": "$context.resourcePath",
+              "httpMethod": "$context.httpMethod",
+              "product_id": "$input.params('product_id')"
+            }
         Type: AWS
         Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FrontendLambdaName}/invocations
 

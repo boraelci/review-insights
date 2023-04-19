@@ -7,11 +7,8 @@ class GetAnalysisHandler:
         self.dynamodb = boto3.client("dynamodb")
         self.table_name = table_name
 
-    def run(self):
+    def run(self, product_id):
         ### dynamodb stuff below ###
-
-        # specify the table name
-        product_id = "airpods"
 
         # specify the query parameters
         query_params = {
@@ -94,4 +91,4 @@ class GetAnalysisHandler:
                 ]
                 ret["historical_data"]["negative"] = new_data
 
-        return {"statusCode": 200, "body": ret}
+        return {"statusCode": 200, "body": json.dumps(ret)}
