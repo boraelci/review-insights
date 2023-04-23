@@ -39,6 +39,7 @@ class GetAnalysisHandler:
                 # ret.append(dictionary)
                 continue
 
+            """
             if r["insight_name"]["S"] == "average_stars_per_category":
                 dictionary = {}
                 dvalue = {}
@@ -64,7 +65,7 @@ class GetAnalysisHandler:
                     for category, count in dvalue.items()
                 ]
                 ret["historical_data"]["negative"] = new_data
-
+            """
             if r["insight_name"]["S"] == "sentiments_over_time":
                 dictionary = {}
                 dvalue = {}
@@ -91,4 +92,4 @@ class GetAnalysisHandler:
                 ]
                 ret["historical_data"]["negative"] = new_data
 
-        return {"statusCode": 200, "body": json.dumps(ret)}
+        return {"statusCode": 200, "body": ret}

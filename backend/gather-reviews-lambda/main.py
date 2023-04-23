@@ -4,6 +4,11 @@ import os
 import boto3
 
 env = os.environ.get("ENV", default="dev")
+
+if env == "dev":
+  webscraper = WebScraper(env=env)
+  webscraper.run(original_url="auto", number_pages=2)
+
 bucket_name = os.environ["REVIEWS_BUCKET_NAME"]
 queue_url = os.environ["EXTRACT_INSIGHTS_QUEUE_URL"]
 
@@ -12,7 +17,7 @@ def lambda_handler(event, context):
     print(event)
 
     product_id, product_link, seller_id = parse_from_sqs(event=event)
-    webscraper = WebScraper(env=env, queue_url=queue_url)
+    webscraper = WebScraper(env=env)
     webscraper.run(original_url=product_link, number_pages=2)
     webscraper.save(
         bucket_name=bucket_name,
@@ -20,20 +25,7 @@ def lambda_handler(event, context):
         reviews=webscraper.amazon_reviews,
     )
     push_to_sqs(product_id=product_id, seller_id=seller_id)
-    return {
-        "statusCode": 200,
-        "body": json.dumps("Success!"),
-    }
-
-
-if env == "dev":
-    lambda_handler(
-        {
-            "product_id": "uuid-1",
-            "product_link": "https://www.amazon.com/Tide-Febreze-Defense-Detergent-Packaging/dp/B01BZQJLFW/ref=asc_df_B01BZQJLFW/?tag=hyprod-20&linkCode=df0&hvadid=309832782859&hvpos=&hvnetw=g&hvrand=14385160540479028809&hvpone=&hvptwo=&hvqmt=&hvdev=c&hvdvcmdl=&hvlocint=&hvlocphy=9073502&hvtargid=pla-425063129473&psc=1&tag=&ref=&adgrpid=70155173188&hvpone=&hvptwo=&hvadid=309832782859&hvpos=&hvnetw=g&hvrand=14385160540479028809&hvqmt=&hvdev=c&hvdvcmdl=&hvlocint=&hvlocphy=9073502&hvtargid=pla-425063129473",
-        },
-        None,
-    )
+    return {"statusCode": 200, "body": "Success!"}
 
 
 def try_ex(func):

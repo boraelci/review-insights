@@ -15,8 +15,8 @@ def lambda_handler(event, context):
         print("Create product")
         create_product_handler = CreateProductHandler(queue_url=queue_url)
         return create_product_handler.run(body=event["body"])
-    elif resourcePath == "/products/{product_id}" and httpMethod == "GET":
+    elif resourcePath == "/analyses/{product_id}" and httpMethod == "GET":
         get_analysis_handler = GetAnalysisHandler(table_name=table_name)
-        return get_analysis_handler.run(product_id=product_id)
+        return get_analysis_handler.run(product_id=event['product_id'])
     else:
         return {"statusCode": 400, "body": "Path/method not implemented in Lambda"}
