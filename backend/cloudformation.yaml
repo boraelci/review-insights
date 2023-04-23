@@ -39,6 +39,18 @@ Parameters:
     Type: String
     Default: generate-report-queue
 
+  FrontendUrl:
+    Type: String
+    Default: http://frontend-412391315699.s3-website-us-east-1.amazonaws.com
+
+  GatherReviewsLambdaTimeout:
+    Type: Number
+    Default: 90
+
+  ExtractInsightsLambdaTimeout:
+    Type: Number
+    Default: 45
+
 Resources:
   ReviewsBucket:
     DependsOn: ExtractInsightsLambda
@@ -135,7 +147,7 @@ Resources:
         S3Bucket: !Ref ArtifactsBucketName
         S3Key: !Sub ${GatherReviewsLambdaName}/lambda_function.zip
       MemorySize: 1024
-      Timeout: 120
+      Timeout: !Ref GatherReviewsLambdaTimeout
       EphemeralStorage:
         Size: 512
 
@@ -175,7 +187,7 @@ Resources:
         S3Bucket: !Ref ArtifactsBucketName
         S3Key: !Sub ${ExtractInsightsLambdaName}/lambda_function.zip
       MemorySize: 128
-      Timeout: 120
+      Timeout: !Ref ExtractInsightsLambdaTimeout
       EphemeralStorage:
         Size: 512
 
@@ -200,6 +212,7 @@ Resources:
       Environment:
         Variables:
           ENV: prod
+          FRONTEND_URL: !Ref FrontendUrl
       FunctionName: !Ref GenerateReportLambdaName
       Handler: main.lambda_handler
       Runtime: python3.9
@@ -220,7 +233,7 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Ref GatherReviewsQueueName
-      VisibilityTimeout: 120
+      VisibilityTimeout: !Ref GatherReviewsLambdaTimeout
 
   GatherReviewsLambdaSQSTrigger:
     Type: AWS::Lambda::EventSourceMapping
@@ -234,7 +247,7 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Ref ExtractInsightsQueueName
-      VisibilityTimeout: 120
+      VisibilityTimeout: !Ref ExtractInsightsLambdaTimeout
 
   ExtractInsightsLambdaSQSTrigger:
     Type: AWS::Lambda::EventSourceMapping
@@ -248,7 +261,7 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: !Ref GenerateReportQueueName
-      VisibilityTimeout: 120
+      VisibilityTimeout: 3
 
   GenerateReportLambdaSQSTrigger:
     Type: AWS::Lambda::EventSourceMapping
@@ -277,7 +290,7 @@ Resources:
   ApiGatewayRestApi:
     Type: AWS::ApiGateway::RestApi
     Properties:
-      Name: Review Insights2
+      Name: Review Insights
       ApiKeySourceType: HEADER
       EndpointConfiguration:
         Types:
@@ -313,6 +326,13 @@ Resources:
       RestApiId: !Ref ApiGatewayRestApi
       PathPart: analyses
       ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+
+  AnalysisByIdResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      PathPart: "{product_id}"
+      ParentId: !Ref AnalysisResource
 
   ProductOptionsMethod:
     DependsOn:
@@ -385,7 +405,7 @@ Resources:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
-      ResourceId: !Ref AnalysisResource
+      ResourceId: !Ref AnalysisByIdResource
       HttpMethod: OPTIONS
       AuthorizationType: NONE
       RequestParameters: {}
@@ -413,11 +433,12 @@ Resources:
     Type: AWS::ApiGateway::Method
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
-      ResourceId: !Ref AnalysisResource
-      HttpMethod: POST
+      ResourceId: !Ref AnalysisByIdResource
+      HttpMethod: GET
       AuthorizationType: NONE
       OperationName: GetAnalysis
-      RequestParameters: {}
+      RequestParameters:
+        "method.request.path.product_id": true
       RequestModels:
         "application/json": "AnalysisModel"
       MethodResponses:
@@ -434,6 +455,13 @@ Resources:
               method.response.header.Access-Control-Allow-Origin: "'*'"
             StatusCode: 200
         PassthroughBehavior: NEVER
+        RequestTemplates:
+          application/json: |
+            {
+              "resourcePath": "$context.resourcePath",
+              "httpMethod": "$context.httpMethod",
+              "product_id": "$input.params('product_id')"
+            }
         Type: AWS
         Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FrontendLambdaName}/invocations
 

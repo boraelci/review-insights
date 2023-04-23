@@ -9,10 +9,10 @@ export function Masthead() {
         <a href="/">Home</a>
       </div>
       <div className="masthead__section">
-        <a href="/register">New</a>
+        <a href="/register">Create</a>
       </div>
       <div className="masthead__section">
-        <a href="/products">View</a>
+        <a href="/products">Products</a>
       </div>
       </div>
   );

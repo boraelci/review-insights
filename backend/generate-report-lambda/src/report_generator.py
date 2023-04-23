@@ -5,33 +5,30 @@ import numpy as np
 
 
 class ReportGenerator:
-    def __init__():
+    def __init__(self):
         pass
 
-    def run(event):
-        # create a DynamoDB client
+    def run(self, frontend_url, product_id, sender_email, receiver_email):
         ses = boto3.client("ses")
-        ses_arn = "arn:aws:ses:us-east-1:412391315699:identity/yl4386@columbia.edu"
+        # ses_arn = "arn:aws:ses:us-east-1:412391315699:identity/yl4386@columbia.edu"
 
-        product_id = "/search?q=hello+world"
-        message = (
-            "Your product report is ready. Please view at this link: https://www.google.com"
-            + product_id
-        )
+        analysis_link = f"{frontend_url}/analyses/{product_id}"
+        message = f"Your product report is ready. Please view at this link: {analysis_link}"
 
         subject = "Your Product Report is Ready"
         body = message
-        sender = "yl4386@columbia.edu"
-        email = "yl4386@columbia.edu"
-        recipients = [email]
+        recipients = [receiver_email]
 
+        """
         emailContent = {
             "Subject": {"Data": subject},
             "Body": {"Text": {"Data": body}},
-            "FromEmailAddress": sender,
+            "FromEmailAddress": sender_email,
             "To": [{"EmailAddress": r} for r in recipients],
         }
-
+        """
+        print(analysis_link)
+        """
         sesClient = boto3.client("ses", region_name="us-east-1")
 
         response = ses.send_email(
@@ -39,5 +36,5 @@ class ReportGenerator:
             Destination={"ToAddresses": recipients},
             Message={"Subject": {"Data": subject}, "Body": {"Text": {"Data": body}}},
         )
-
-        return "success"
+        """
+        return {"statusCode": 200, "body": "Success!"}

@@ -11,7 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 
 class WebScraper:
-    def __init__(self, env, queue_url):
+    def __init__(self, env):
         self.env = env
         self.s3 = boto3.client("s3")
 
@@ -48,7 +48,7 @@ class WebScraper:
             driver.get(url)
 
             # wait for num_review_count to be present
-            WebDriverWait(driver, 10).until(
+            WebDriverWait(driver, 30).until(
                 EC.presence_of_element_located(
                     (
                         By.XPATH,
@@ -88,8 +88,9 @@ class WebScraper:
                     By.CSS_SELECTOR, "a[data-hook='review-title']"
                 ).text
                 title = title_a.replace("\n", "")
-                review_list.append([date, stars, title, review])
-
+                if len(date) != 0 and len(stars) != 0 and len(title) != 0 and len(review) != 0:
+                    review_list.append([date, stars, title, review])
+            
             amazon_reviews += review_list
             page += 1
         driver.quit()

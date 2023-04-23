@@ -20,8 +20,8 @@ def lambda_handler(event, context):
     analyzer = Analyzer(table_name=table_name, queue_url=queue_url)
     result = analyzer.run(key=key, reviews=csv_content)
     print(result)
-    return result
-    # return {"statusCode": 200, "body": json.dumps("Success!")}
+    push_to_sqs(product_id=product_id, seller_id=seller_id)
+    return {"statusCode": 200, "body": "Success!"}
 
 
 def try_ex(func):

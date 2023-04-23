@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import {Register} from "./pages/Register.js";
-import {Home} from "./pages/Home.js";
-import {Analysis} from "./pages/Analysis.js";
-import {ViewProducts} from "./pages/ViewProducts.js"
+import {
+  CreateProductPage,
+  ProductsPage,
+  HomePage,
+  AnalysesPage,
+} from './pages';
 import './App.css';
 
 function App() {
-
   return (
     <div>
       <Routes>
-        <Route path="/" element={<Home />}/>
-        <Route path="/products" element={<ViewProducts />}/>
-        <Route path="/analysis/" element={<Analysis />}/>
-        <Route path="/register" element={<Register />}/>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/products" element={<ProductsPage />} />
+        <Route path="/analyses/:product_id" element={<AnalysesPage />} />
+        <Route path="/register" element={<CreateProductPage />} />
       </Routes>
     </div>
   );

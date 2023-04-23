@@ -22,6 +22,7 @@ class CreateProductHandler:
             product_category=product_category,
             seller_id=seller_id,
         )
+        return {"statusCode": 200, "body": "Success!"}
 
     def push_to_sqs(
         self, product_id, product_link, product_name, product_category, seller_id
