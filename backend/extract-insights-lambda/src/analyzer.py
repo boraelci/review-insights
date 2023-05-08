@@ -1,24 +1,22 @@
 import csv
 import json
-from datetime import datetime
+import datetime
 import time
 from botocore.exceptions import ClientError
 from math import pi
 from collections import defaultdict
 import boto3
+import random
+from concurrent.futures import ThreadPoolExecutor, as_completed
+try:
+    from .gpt_wrapper import GptWrapper
+except:
+    from gpt_wrapper import GptWrapper
+import os
 
-# Show graphs
-show_graphs = False
-if show_graphs:
-    import matplotlib.pyplot as plt
-# Initialize AWS services
-# sagemaker = boto3.client("sagemaker-runtime")
 comprehend = boto3.client("comprehend")
-# rekognition = boto3.client("rekognition")
-# translate = boto3.client("translate")
 s3 = boto3.client("s3")
-visualize_bucket = "project-visualized-images"
-
+env = os.environ.get("ENV", default="dev")
 
 def round_float(number):
     """
@@ -28,110 +26,58 @@ def round_float(number):
 
 
 class Analyzer:
-    def __init__(self, table_name, queue_url):
+    def __init__(self, table_name, queue_url, product_name, product_category):
         self.table_name = table_name
         self.queue_url = queue_url
+        self.product_name = product_name
+        self.product_category = product_category
 
-    def get_text_sentiment(self, text):
-        response = comprehend.detect_sentiment(Text=text, LanguageCode="en")
-        return response["Sentiment"]
+    def run(self, product_id, product_name, product_link, product_category, seller_id, csv_content):
+        historical_data = self.get_historical_data(csv_content)
+        categorical_data = self.get_categorical_data(csv_content)
 
-    def translate_text(self, text, target_language):
-        response = translate.translate_text(
-            Text=text, SourceLanguageCode="en", TargetLanguageCode=target_language
-        )
-        return response["TranslatedText"]
-
-    def run(self, key, reviews):
-        avg_stars = self.average_stars(reviews)
-        sentiments = self.analyze_sentiments(reviews)
-        avg_stars_category = self.categorize_reviews(reviews)
-
+        
+        if True and env == "dev":
+            print({
+                "product_id": product_id,
+                "historical_data": historical_data,
+                "categorical_data": categorical_data
+            })
+            return
+        
+        
         # Create DynamoDB client and table resource objects
         dynamodb = boto3.resource("dynamodb")
         table = dynamodb.Table(self.table_name)
 
-        # Add data to DynamoDB
-        key = key.replace(".csv", "")
         table.put_item(
             Item={
-                "product_id": key,
-                "insight_name": "average_stars_over_time",
-                "data": json.dumps(avg_stars),
-            }
-        )
-        table.put_item(
-            Item={
-                "product_id": key,
-                "insight_name": "sentiments_over_time",
-                "data": json.dumps(sentiments),
-            }
-        )
-        table.put_item(
-            Item={
-                "product_id": key,
-                "insight_name": "average_stars_per_category",
-                "data": json.dumps(avg_stars_category),
+                "product_id": product_id,
+                "product_name": product_name,
+                "product_link": product_link,
+                "product_category": product_category,
+                "seller_id": seller_id,
+                "historical_data": json.dumps(historical_data),
+                "categorical_data": json.dumps(categorical_data)
             }
         )
 
         return {
-            "body": {
-                "insights": [
-                    {"average_stars_over_time": json.dumps(avg_stars)},
-                    {"sentiments_over_time": json.dumps(sentiments)},
-                    {"average_stars_per_category": json.dumps(avg_stars_category)},
-                ]
-            }
+            "product_id": product_id,
+            "historical_data": historical_data,
+            "categorical_data": categorical_data
         }
 
-    def average_stars(self, csv_content):
-        # Parse CSV content
-        data = []
-        reader = csv.DictReader(csv_content.splitlines())
-        for row in reader:
-            data.append(row)
-
-        # Convert date strings to datetime objects
-        for row in data:
-            row["Date"] = datetime.strptime(row["Date"], "%B %d, %Y")
-
-        # Group data by date and calculate average stars
-        date_stars = {}
-        for row in data:
-            date: datetime = row["Date"]
-            stars = float(row["Stars"])
-            if date in date_stars:
-                date_stars[date]["stars"].append(stars)
-            else:
-                date_stars[date] = {"stars": [stars]}
-
-        dates = []
-        avg_stars = []
-        for date, star_data in date_stars.items():
-            dates.append(str(date))
-            avg_stars.append(
-                round_float(sum(star_data["stars"]) / len(star_data["stars"]))
-            )
-
-        if show_graphs:
-            # Create plot using Matplotlib
-            plt.plot(dates, avg_stars)
-            plt.xlabel("Date")
-            plt.ylabel("Average Stars")
-            plt.title("Average Stars Over Time")
-            plt.show()
-
-        return {"stars": avg_stars, "dates": dates}
-
-    def analyze_sentiments(self, csv_content):
+    def get_historical_data(self, csv_content):
+        csv_content = csv.DictReader(csv_content.splitlines())
         comprehend = boto3.client("comprehend")
-        reader = csv.DictReader(csv_content.splitlines())
         reviews = []
         dates = []
-        for row in reader:
+        for row in csv_content:
             reviews.append(row["Review"])
-            dates.append(row["Date"])
+            date_obj = datetime.datetime.strptime(row["Date"], "%B %d, %Y")
+            formatted_date = date_obj.strftime("%m/%d/%Y")
+            dates.append(formatted_date)
 
         # Use Comprehend to analyze sentiments for all reviews
         sentiment_batches = []
@@ -159,135 +105,111 @@ class Analyzer:
                         # If some other exception, re-raise it
                         raise e
 
-        # Combine sentiment scores for all batches
-        pos_sentiments = []
-        neg_sentiments = []
+        positives = {}
+        negatives = {}
+        i = 0
         for batch in sentiment_batches:
             for sentiment in batch["ResultList"]:
-                pos_sentiments.append(sentiment["SentimentScore"]["Positive"])
-                neg_sentiments.append(sentiment["SentimentScore"]["Negative"])
-
-        # Group sentiments by date
-        sentiments_by_date = {}
-        for i in range(len(dates)):
-            if dates[i] not in sentiments_by_date:
-                sentiments_by_date[dates[i]] = {
-                    "positive": 0,
-                    "negative": 0,
-                    "count": 0,
-                }
-            sentiments_by_date[dates[i]]["positive"] += pos_sentiments[i]
-            sentiments_by_date[dates[i]]["negative"] += neg_sentiments[i]
-            sentiments_by_date[dates[i]]["count"] += 1
-
-        # Compute average sentiments for each date
-        avg_pos_sentiments = []
-        avg_neg_sentiments = []
-        for date, sentiments in sentiments_by_date.items():
-            avg_pos_sentiments.append(
-                round_float(sentiments["positive"] / sentiments["count"])
-            )
-            avg_neg_sentiments.append(
-                round_float(sentiments["negative"] / sentiments["count"])
-            )
-
-        if show_graphs:
-            # Create a graph with two plots - negative sentiments and positive sentiments over time
-            plt.plot(
-                list(sentiments_by_date.keys()),
-                avg_neg_sentiments,
-                label="Negative Sentiments",
-            )
-            plt.plot(
-                list(sentiments_by_date.keys()),
-                avg_pos_sentiments,
-                label="Positive Sentiments",
-            )
-            plt.xlabel("Date")
-            plt.ylabel("Sentiment Score")
-            plt.title("Sentiment Analysis of Reviews")
-            plt.legend()
-            plt.show()
+                score = sentiment["SentimentScore"]["Positive"]
+                date = dates[i]
+                if score > 0.5:
+                    positives[date] = positives.get(date, 0) + 1
+                else:
+                    negatives[date] = negatives.get(date, 0) + 1
+                
+                i += 1
 
         return {
-            "positive": avg_pos_sentiments,
-            "negative": avg_neg_sentiments,
-            "dates": [str(date) for date in list(sentiments_by_date.keys())],
+            "positives": positives,
+            "negatives": negatives,
         }
 
-    def categorize_reviews(self, csv_content):
-        # Define the categories and the keywords that belong to each category
-        categories = {
-            "cost": ["cost", "price", "expensive", "affordable", "inexpensive"],
-            "ease of use": [
-                "easy",
-                "difficult",
-                "complicated",
-                "user-friendly",
-                "intuitive",
-            ],
-            "effectiveness": [
-                "effective",
-                "ineffective",
-                "successful",
-                "failure",
-                "helpful",
-            ],
-            "quality": ["quality", "cheap", "poor", "well-made", "flimsy"],
-            "durability": ["durable", "breakable", "long-lasting", "fragile", "sturdy"],
+    def get_categorical_data(self, csv_content):
+        csv_content = csv.DictReader(csv_content.splitlines())
+        user_prompt_generate_categories = f"Product Name: {self.product_name} Product Category: {self.product_category}"
+        system_prompt_generate_categories = "Generate and list 5 category names that customer reviews of the given product can be classified into, based on each review's main topic. The categories should be relevant to the type of the product being reviewed, not necessarily specific to this product. First one is \"Value for Money\" Reply in the following format: [\"<CATEGORY-1>\", ...]"
+        gpt_generate_categories = GptWrapper(system_prompt_generate_categories)
+
+        categories = eval(gpt_generate_categories.query(user_prompt_generate_categories))
+        print(categories)
+
+        reviews = []
+        for row in csv_content:
+            reviews.append(f"Index:{row['Index']} Review:{row['Review']}")
+
+        system_prompt_evaluate_categories = f"Perform sentiment analysis on the following customer reviews based on the following categories. Categories: {categories}. For each review, label the category with the review's sentiment (Positive, Negative, or Neutral) if the review can be classified into a category, otherwise label it as {{\"<CATEGORY_NAME>\": \"N/A\"}}. Respond in the following format: {{\"<REVIEW_INDEX_1>\": {{\"<CATEGORY_1>\":\"<SENTIMENT>\", ...}}, ...}}. Don't include any explanation."
+        gpt_evaluate_categories = GptWrapper(system_prompt_evaluate_categories)
+        review_index_to_category_sentiments = {}
+        
+        def process_review(user_prompt_evaluate_categories):
+            try:
+                response = gpt_evaluate_categories.query(user_prompt_evaluate_categories)
+                # print(response)
+                return eval(response)
+            except:
+                return {}
+
+        workers_size = 10
+        batch_size = 25
+        with ThreadPoolExecutor(max_workers=workers_size) as executor:
+            futures = []
+            for i in range(0, len(reviews), batch_size):
+                user_prompt_evaluate_categories = str(reviews[i : i + batch_size])
+                futures.append(executor.submit(process_review, user_prompt_evaluate_categories))
+
+            for future in as_completed(futures):
+                try:
+                    result = future.result()
+                    review_index_to_category_sentiments.update(result)
+                except KeyboardInterrupt:
+                    raise KeyboardInterrupt
+                except Exception as e:
+                    print(f"Job failed with error: {e}")
+        
+        print(review_index_to_category_sentiments)
+        positives = {} 
+        negatives = {}
+        for review_index, category_sentiments in review_index_to_category_sentiments.items():
+            for category, sentiment in category_sentiments.items():
+                if sentiment == "N/A" or category not in categories:
+                    continue
+                elif sentiment == "Positive":
+                    positives[category] = positives.get(category, 0) + 1
+                elif sentiment == "Negative":
+                    negatives[category] = negatives.get(category, 0) + 1
+        print(positives)
+
+        return {
+            "positives": positives,
+            "negatives": negatives,
         }
+        """
+        total_count = len(list(csv_content))
+        per_category_max_count = total_count // len(categories)
 
-        # Create a defaultdict to store the reviews for each category
-        reviews_per_category = defaultdict(list)
+        positives = {}
+        negatives = {}
+        for category in categories:
+            positives[category] = random.randint(1, per_category_max_count)
+            negatives[category] = random.randint(1, per_category_max_count)
 
-        # Create a defaultdict to store the total stars for each category
-        stars_per_category = defaultdict(int)
-
-        # Create a defaultdict to store the number of reviews for each category
-        num_reviews_per_category = defaultdict(int)
-
-        # Parse the CSV file
-        reader = csv.DictReader(csv_content.splitlines())
-
-        # Loop over the reviews and categorize them
-        for row in reader:
-            for category, keywords in categories.items():
-                for keyword in keywords:
-                    if keyword in row["Review"].lower():
-                        reviews_per_category[category].append(row)
-                        stars_per_category[category] += int(float(row["Stars"]))
-                        num_reviews_per_category[category] += 1
-                        break
-
-        # Compute the average rating for each category
-        avg_stars_per_category = {
-            category: round_float(
-                stars_per_category[category] / num_reviews_per_category[category]
-            )
-            for category in categories
-            if num_reviews_per_category[category] > 0
+        return {
+            "positives": positives,
+            "negatives": negatives,
         }
+        """
+        
 
-        if show_graphs:
-            # Create the radar chart
-            categories = list(avg_stars_per_category.keys())
-            values = list(avg_stars_per_category.values())
-            values += values[:1]
-            angles = [
-                n / float(len(categories)) * 2 * pi for n in range(len(categories))
-            ]
-            angles += angles[:1]
+if __name__ == "__main__":
+    product_id = "ea5d434d-e764-4d3b-a59c-02ada9cce5ea"
+    with open (f"data/{product_id}.csv", "r") as f:
+        csv_content = f.read()
+    analyzer = Analyzer(table_name="analysis-table", queue_url=None, product_name="Apple AirPods Pro", product_category="Electronics")
+    result = analyzer.run(
+        product_id=product_id,
+        product_name="Apple AirPods Pro",
+        product_link="https://",
+        product_category="Electronics",
+        seller_id="123",
+        csv_content=csv_content)
 
-            fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
-            ax.set_theta_offset(pi / 2)
-            ax.set_theta_direction(-1)
-            plt.xticks(angles[:-1], categories)
-            ax.set_rlabel_position(0)
-            plt.yticks([1, 2, 3, 4, 5], color="grey", size=7)
-            plt.ylim(0, 5)
-            ax.plot(angles, values, linewidth=1, linestyle="solid")
-            ax.fill(angles, values, "b", alpha=0.1)
-
-            plt.show()
-
-        return avg_stars_per_category

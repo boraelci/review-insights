@@ -1,0 +1,147 @@
+{
+	"analyses":[
+		 {
+				"reviewId":"1",
+				"stars":"4.5",
+				"generalSentiment":"positive",
+				"positiveCategories":[
+					 "Value for Money",
+					 "Sound Quality",
+					 "Comfort and Fit",
+					 "Connectivity and Compatibility"
+				],
+				"negativeCategories":[
+					 "Battery Life"
+				]
+		 },
+		 {
+				"reviewId":"2",
+				"stars":"3",
+				"generalSentiment":"mixed",
+				"positiveCategories":[
+					 "Connectivity and Compatibility",
+					 "Comfort and Fit"
+				],
+				"negativeCategories":[
+					 "Value for Money",
+					 "Sound Quality",
+					 "Battery Life"
+				]
+		 },
+		 {
+				"reviewId":"3",
+				"stars":"5",
+				"generalSentiment":"positive",
+				"positiveCategories":[
+					 "Sound Quality",
+					 "Comfort and Fit",
+					 "Connectivity and Compatibility"
+				],
+				"negativeCategories":[
+					 "Value for Money",
+					 "Battery Life"
+				]
+		 },
+		 {
+				"reviewId":"4",
+				"stars":"2",
+				"generalSentiment":"negative",
+				"positiveCategories":[
+					 "Comfort and Fit"
+				],
+				"negativeCategories":[
+					 "Value for Money",
+					 "Sound Quality",
+					 "Battery Life",
+					 "Connectivity and Compatibility"
+				]
+		 },
+		 {
+				"reviewId":"5",
+				"stars":"4",
+				"generalSentiment":"positive",
+				"positiveCategories":[
+					 "Value for Money",
+					 "Comfort and Fit",
+					 "Connectivity and Compatibility"
+				],
+				"negativeCategories":[
+					 "Sound Quality",
+					 "Battery Life"
+				]
+		 },
+		 {
+				"reviewId":"6",
+				"stars":"1",
+				"generalSentiment":"negative",
+				"positiveCategories":[
+					 
+				],
+				"negativeCategories":[
+					 "Value for Money",
+					 "Sound Quality",
+					 "Comfort and Fit",
+					 "Battery Life",
+					 "Connectivity and Compatibility"
+				]
+		 },
+		 {
+				"reviewId":"7",
+				"stars":"4",
+				"generalSentiment":"positive",
+				"positiveCategories":[
+					 "Sound Quality",
+					 "Comfort and Fit"
+				],
+				"negativeCategories":[
+					 "Value for Money",
+					 "Battery Life",
+					 "Connectivity and Compatibility"
+				]
+		 },
+		 {
+				"reviewId":"8",
+				"stars":"3",
+				"generalSentiment":"mixed",
+				"positiveCategories":[
+					 "Value for Money",
+					 "Comfort and Fit",
+					 "Battery Life"
+				],
+				"negativeCategories":[
+					 "Sound Quality",
+					 "Connectivity and Compatibility"
+				]
+		 },
+		 {
+				"reviewId":"9",
+				"stars":"5",
+				"generalSentiment":"positive",
+				"positiveCategories":[
+					 "Value for Money",
+					 "Sound Quality",
+					 "Comfort and Fit",
+					 "Battery Life",
+					 "Connectivity and Compatibility"
+				],
+				"negativeCategories":[
+					 
+				]
+		 },
+		 {
+				"reviewId":"10",
+				"stars":"2",
+				"generalSentiment":"negative",
+				"positiveCategories":[
+					 
+				],
+				"negativeCategories":[
+					 "Value for Money",
+					 "Sound Quality",
+					 "Comfort and Fit",
+					 "Battery Life",
+					 "Connectivity and Compatibility"
+				]
+		 }
+	]
+}

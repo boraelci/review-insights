@@ -1,5 +1,6 @@
 from src.create_product_handler import CreateProductHandler
 from src.get_analysis_handler import GetAnalysisHandler
+from src.list_products_handler import ListProductsHandler
 import json
 import os
 
@@ -18,5 +19,8 @@ def lambda_handler(event, context):
     elif resourcePath == "/analyses/{product_id}" and httpMethod == "GET":
         get_analysis_handler = GetAnalysisHandler(table_name=table_name)
         return get_analysis_handler.run(product_id=event['product_id'])
+    elif resourcePath == "/products" and httpMethod == "GET":
+        list_products_handler = ListProductsHandler(table_name=table_name)
+        return list_products_handler.run()
     else:
         return {"statusCode": 400, "body": "Path/method not implemented in Lambda"}

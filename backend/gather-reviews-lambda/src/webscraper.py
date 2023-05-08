@@ -31,7 +31,9 @@ class WebScraper:
 
         if original_url == "auto":
             # original_url = "https://www.amazon.com/Apple-AirPods-Charging-Latest-Model/dp/B07PXGQC1Q/ref=sr_1_1_sspa?dchild=1&keywords=airpods&qid=1610226273&sr=8-1-spons&psc=1&spLa=ZW5jcnlwdGVkUXVhbGlmaWVyPUFVNkIyMEFDM0NEWkEmZW5jcnlwdGVkSWQ9QTA0NDI5MDgyVkZDOVNMVUtIUUdaJmVuY3J5cHRlZEFkSWQ9QTAzMDg3NzMyQzIzWFNBVjJGMUxXJndpZGdldE5hbWU9c3BfYXRmJmFjdGlvbj1jbGlja1JlZGlyZWN0JmRvTm90TG9nQ2xpY2s9dHJ1ZQ=="
-            original_url = "https://www.amazon.com/Tide-Febreze-Defense-Detergent-Packaging/dp/B01BZQJLFW/ref=asc_df_B01BZQJLFW/?tag=hyprod-20&linkCode=df0&hvadid=309832782859&hvpos=&hvnetw=g&hvrand=14385160540479028809&hvpone=&hvptwo=&hvqmt=&hvdev=c&hvdvcmdl=&hvlocint=&hvlocphy=9073502&hvtargid=pla-425063129473&psc=1&tag=&ref=&adgrpid=70155173188&hvpone=&hvptwo=&hvadid=309832782859&hvpos=&hvnetw=g&hvrand=14385160540479028809&hvqmt=&hvdev=c&hvdvcmdl=&hvlocint=&hvlocphy=9073502&hvtargid=pla-425063129473"
+            # original_url = "https://www.amazon.com/Apple-Generation-Cancelling-Transparency-Personalized/dp/B0BDHWDR12/ref=sr_1_2_sspa?crid=1A8WSAPUPOH5T&keywords=airpods&qid=1682215894&sprefix=airpods%2Caps%2C116&sr=8-2-spons&ufe=app_do%3Aamzn1.fos.f5122f16-c3e8-4386-bf32-63e904010ad0&psc=1&spLa=ZW5jcnlwdGVkUXVhbGlmaWVyPUEzRkpWREg5MlBaNzdZJmVuY3J5cHRlZElkPUEwNDQ5NDAzMTNERTUzQjc5SEZGTyZlbmNyeXB0ZWRBZElkPUEwMTA0MTY5M0pBTE1KNTlJTEoxSSZ3aWRnZXROYW1lPXNwX2F0ZiZhY3Rpb249Y2xpY2tSZWRpcmVjdCZkb05vdExvZ0NsaWNrPXRydWU="
+            # original_url = "https://www.amazon.com/Tide-Febreze-Defense-Detergent-Packaging/dp/B01BZQJLFW/ref=asc_df_B01BZQJLFW/?tag=hyprod-20&linkCode=df0&hvadid=309832782859&hvpos=&hvnetw=g&hvrand=14385160540479028809&hvpone=&hvptwo=&hvqmt=&hvdev=c&hvdvcmdl=&hvlocint=&hvlocphy=9073502&hvtargid=pla-425063129473&psc=1&tag=&ref=&adgrpid=70155173188&hvpone=&hvptwo=&hvadid=309832782859&hvpos=&hvnetw=g&hvrand=14385160540479028809&hvqmt=&hvdev=c&hvdvcmdl=&hvlocint=&hvlocphy=9073502&hvtargid=pla-425063129473"
+            original_url = "https://www.amazon.com/TATOFY-AirPods-Stylish-Patterns-Protective/dp/B09M6R1589/ref=sr_1_5?crid=2MG6LHGJXKVSS&keywords=airpods%2Bcase&qid=1683574352&sprefix=airpods%2Bcase%2Caps%2C80&sr=8-5&th=1"
         # number of pages: 100 pages = 950 almost 1000 reviews
 
         driver.get(original_url)
@@ -48,7 +50,7 @@ class WebScraper:
             driver.get(url)
 
             # wait for num_review_count to be present
-            WebDriverWait(driver, 30).until(
+            WebDriverWait(driver, 3).until(
                 EC.presence_of_element_located(
                     (
                         By.XPATH,
@@ -70,26 +72,31 @@ class WebScraper:
 
             reviews = driver.find_elements(By.CSS_SELECTOR, "div[data-hook='review']")
             for r in reviews:
-                date_span = r.find_element(
-                    By.CSS_SELECTOR, "span[data-hook='review-date']"
-                )
-                date = date_span.text.split("on ")[1]
-                review_span = r.find_element(
-                    By.CSS_SELECTOR, "span[data-hook='review-body']"
-                )
-                review = review_span.find_element(By.CSS_SELECTOR, "span").text.replace(
-                    "\n", ""
-                )
-                stars_i = r.find_element(
-                    By.CSS_SELECTOR, "i[data-hook='review-star-rating']"
-                ).get_attribute("textContent")
-                stars = stars_i.split(" out")[0]
-                title_a = r.find_element(
-                    By.CSS_SELECTOR, "a[data-hook='review-title']"
-                ).text
-                title = title_a.replace("\n", "")
-                if len(date) != 0 and len(stars) != 0 and len(title) != 0 and len(review) != 0:
-                    review_list.append([date, stars, title, review])
+                try:
+                    date_span = r.find_element(
+                        By.CSS_SELECTOR, "span[data-hook='review-date']"
+                    )
+                    date = date_span.text.split("on ")[1]
+                    review_span = r.find_element(
+                        By.CSS_SELECTOR, "span[data-hook='review-body']"
+                    )
+                    review = review_span.find_element(By.CSS_SELECTOR, "span").text.replace(
+                        "\n", ""
+                    )
+                    stars_i = r.find_element(
+                        By.CSS_SELECTOR, "i[data-hook='review-star-rating']"
+                    ).get_attribute("textContent")
+                    stars = stars_i.split(" out")[0]
+                    title_a = r.find_element(
+                        By.CSS_SELECTOR, "a[data-hook='review-title']"
+                    ).text
+                    title = title_a.replace("\n", "")
+                    if len(date) != 0 and len(stars) != 0 and len(title) != 0 and len(review) != 0:
+                        review_list.append([date, stars, title, review])
+                except Exception as e:
+                    print(e)
+                    print("Continuing to next review")
+                    continue
             
             amazon_reviews += review_list
             page += 1

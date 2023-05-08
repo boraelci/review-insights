@@ -21,75 +21,19 @@ class GetAnalysisHandler:
         query_response = self.dynamodb.query(**query_params)
 
         # return the results
-        data = query_response["Items"]
+        response = query_response["Items"]
+        if len(response) == 0:
+            return {"statusCode": 404, "body": "Not found"}
 
-        ret = {}
-        ret["product_id"] = product_id
-
-        for r in data:
-            if r["insight_name"]["S"] == "average_stars_over_time":
-                # dictionary = {}
-                # dvalue = {}
-                # jd = json.loads(r['data']['S'])
-                # #return jd['stars']
-                # for i in range(len(jd['stars'])):
-                # 		dvalue[jd['dates'][i]] = jd['stars'][i]
-
-                # dictionary['average_stars_over_time'] = dvalue
-                # ret.append(dictionary)
-                continue
-
-            """
-            if r["insight_name"]["S"] == "average_stars_per_category":
-                dictionary = {}
-                dvalue = {}
-                jd = json.loads(r["data"]["S"])
-                for i in range(len(jd["positive"])):
-                    dvalue[jd["dates"][i]] = jd["positive"][i]
-
-                ret["categorical_data"] = {}
-                new_data = [
-                    {"category": category, "count": str(count)}
-                    for category, count in dvalue.items()
-                ]
-                ret["historical_data"]["positive"] = new_data
-
-                dictionary = {}
-                dvalue = {}
-                jd = json.loads(r["data"]["S"])
-                for i in range(len(jd["negative"])):
-                    dvalue[jd["dates"][i]] = jd["negative"][i]
-
-                new_data = [
-                    {"category": category, "count": str(count)}
-                    for category, count in dvalue.items()
-                ]
-                ret["historical_data"]["negative"] = new_data
-            """
-            if r["insight_name"]["S"] == "sentiments_over_time":
-                dictionary = {}
-                dvalue = {}
-                jd = json.loads(r["data"]["S"])
-                for i in range(len(jd["positive"])):
-                    dvalue[jd["dates"][i]] = jd["positive"][i]
-
-                ret["historical_data"] = {}
-                new_data = [
-                    {"date": date, "count": str(count)}
-                    for date, count in dvalue.items()
-                ]
-                ret["historical_data"]["positive"] = new_data
-
-                dictionary = {}
-                dvalue = {}
-                jd = json.loads(r["data"]["S"])
-                for i in range(len(jd["negative"])):
-                    dvalue[jd["dates"][i]] = jd["negative"][i]
-
-                new_data = [
-                    {"date": date, "count": str(count)}
-                    for date, count in dvalue.items()
-                ]
-                ret["historical_data"]["negative"] = new_data
+        item = response[0]
+        ret = {
+            "historical_data": json.loads(item["historical_data"]["S"]),
+            "categorical_data": json.loads(item["categorical_data"]["S"]),
+        }
 
         return {"statusCode": 200, "body": ret}
+
+if __name__ == "__main__":
+    handler = GetAnalysisHandler("analysis-table")
+    result = handler.run("c982d117-2fcc-4cb7-b916-eec2b8fd3d97")
+    print(result)

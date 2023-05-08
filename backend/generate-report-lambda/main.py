@@ -7,7 +7,9 @@ frontend_url = os.environ["FRONTEND_URL"]
 def lambda_handler(event, context):
     product_id, seller_id = parse_from_sqs(event=event)
     sender_email = "be2246@columbia.edu"
-    receiver_email = "be2246@columbia.edu"
+    receiver_email = seller_id
+    if '@' not in receiver_email:
+        return {"statusCode": 404, "body": "Invalid email!"}
     report_generator = ReportGenerator()
     report_generator.run(frontend_url=frontend_url, product_id=product_id, sender_email=sender_email, receiver_email=receiver_email)
     return {"statusCode": 200, "body": "Success!"}

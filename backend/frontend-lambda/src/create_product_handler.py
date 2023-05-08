@@ -14,7 +14,7 @@ class CreateProductHandler:
         product_name = body["product_name"]
         product_link = body["product_link"]
         product_category = body["product_category"]
-        seller_id = "be2246"  # TODO: get seller_id from body
+        seller_id = body["seller_id"]
         self.push_to_sqs(
             product_id=product_id,
             product_name=product_name,

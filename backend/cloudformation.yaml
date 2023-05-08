@@ -1,4 +1,8 @@
 Parameters:
+  OpenaiApiKey:
+    Type: String
+    NoEcho: true
+  
   ArtifactsBucketName:
     Type: String
     Default: artifacts-412391315699
@@ -49,7 +53,11 @@ Parameters:
 
   ExtractInsightsLambdaTimeout:
     Type: Number
-    Default: 45
+    Default: 300
+
+  DeadLetterQueueName:
+    Type: String
+    Default: dead-letter-queue
 
 Resources:
   ReviewsBucket:
@@ -111,6 +119,16 @@ Resources:
         S3Key: !Sub ${GatherReviewsLambdaName}/layer-headless_chrome.zip
       CompatibleRuntimes:
         - python3.8
+
+  OpenaiLayer:
+    Type: AWS::Lambda::LayerVersion
+    Properties:
+      LayerName: layer-openai
+      Content:
+        S3Bucket: !Ref ArtifactsBucketName
+        S3Key: !Sub ${ExtractInsightsLambdaName}/layer-openai.zip
+      CompatibleRuntimes:
+        - python3.9
 
   GatherReviewsLambdaRole:
     Type: AWS::IAM::Role
@@ -177,16 +195,19 @@ Resources:
           REVIEWS_BUCKET_NAME: !Ref ReviewsBucketName
           GENERATE_REPORT_QUEUE_URL: !GetAtt GenerateReportQueue.QueueUrl
           ANALYSIS_TABLE_NAME: !Ref AnalysisTableName
+          OPENAI_API_KEY: !Ref OpenaiApiKey
       FunctionName: !Ref ExtractInsightsLambdaName
       Handler: main.lambda_handler
       Runtime: python3.9
       Role: !GetAtt ExtractInsightsLambdaRole.Arn
+      Layers:
+        - !Ref OpenaiLayer
       Architectures:
         - x86_64
       Code:
         S3Bucket: !Ref ArtifactsBucketName
         S3Key: !Sub ${ExtractInsightsLambdaName}/lambda_function.zip
-      MemorySize: 128
+      MemorySize: 1024
       Timeout: !Ref ExtractInsightsLambdaTimeout
       EphemeralStorage:
         Size: 512
@@ -234,6 +255,9 @@ Resources:
     Properties:
       QueueName: !Ref GatherReviewsQueueName
       VisibilityTimeout: !Ref GatherReviewsLambdaTimeout
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 1
 
   GatherReviewsLambdaSQSTrigger:
     Type: AWS::Lambda::EventSourceMapping
@@ -248,6 +272,9 @@ Resources:
     Properties:
       QueueName: !Ref ExtractInsightsQueueName
       VisibilityTimeout: !Ref ExtractInsightsLambdaTimeout
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 1
 
   ExtractInsightsLambdaSQSTrigger:
     Type: AWS::Lambda::EventSourceMapping
@@ -262,6 +289,9 @@ Resources:
     Properties:
       QueueName: !Ref GenerateReportQueueName
       VisibilityTimeout: 3
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeadLetterQueue.Arn
+        maxReceiveCount: 1
 
   GenerateReportLambdaSQSTrigger:
     Type: AWS::Lambda::EventSourceMapping
@@ -271,19 +301,20 @@ Resources:
       EventSourceArn: !GetAtt GenerateReportQueue.Arn
       FunctionName: !Ref GenerateReportLambda
 
+  DeadLetterQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Ref DeadLetterQueueName
+
   AnalysisTable:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
         - AttributeName: product_id
           AttributeType: S
-        - AttributeName: insight_name
-          AttributeType: S
       KeySchema:
         - AttributeName: product_id
           KeyType: HASH
-        - AttributeName: insight_name
-          KeyType: RANGE
       TableName: !Ref AnalysisTableName
       BillingMode: PAY_PER_REQUEST
 
@@ -439,8 +470,6 @@ Resources:
       OperationName: GetAnalysis
       RequestParameters:
         "method.request.path.product_id": true
-      RequestModels:
-        "application/json": "AnalysisModel"
       MethodResponses:
         - ResponseParameters:
             method.response.header.Access-Control-Allow-Headers: false
@@ -461,6 +490,40 @@ Resources:
               "resourcePath": "$context.resourcePath",
               "httpMethod": "$context.httpMethod",
               "product_id": "$input.params('product_id')"
+            }
+        Type: AWS
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FrontendLambdaName}/invocations
+
+  ProductGetMethod:
+    DependsOn:
+      - ProductModel
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ProductResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      OperationName: GetAnalysis
+      RequestParameters: {}
+      MethodResponses:
+        - ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: false
+            method.response.header.Access-Control-Allow-Methods: false
+            method.response.header.Access-Control-Allow-Origin: false
+          StatusCode: 200
+      Integration:
+        ContentHandling: CONVERT_TO_TEXT
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            StatusCode: 200
+        PassthroughBehavior: NEVER
+        RequestTemplates:
+          application/json: |
+            {
+              "resourcePath": "$context.resourcePath",
+              "httpMethod": "$context.httpMethod"
             }
         Type: AWS
         Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:${FrontendLambdaName}/invocations
@@ -524,7 +587,7 @@ Resources:
         {
           "type" : "object",
           "properties" : {
-            "analysis_id" : {
+            "product_id" : {
               "type" : "string"
             },
             "historical_data" : {
@@ -540,7 +603,7 @@ Resources:
   HistoricalDataModel:
     Type: AWS::ApiGateway::Model
     DependsOn:
-      - MonthlyCountModel
+      - DailyCountModel
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
       Name: HistoricalDataModel
@@ -548,16 +611,16 @@ Resources:
         {
           "type" : "object",
           "properties" : {
-            "positive" : {
+            "positives" : {
               "type" : "array",
               "items" : {
-                "$ref" : "https://apigateway.amazonaws.com/restapis/${ApiGatewayRestApi}/models/MonthlyCountModel"
+                "$ref" : "https://apigateway.amazonaws.com/restapis/${ApiGatewayRestApi}/models/DailyCountModel"
               }
             },
-            "negative" : {
+            "negatives" : {
               "type" : "array",
               "items" : {
-                "$ref" : "https://apigateway.amazonaws.com/restapis/${ApiGatewayRestApi}/models/MonthlyCountModel"
+                "$ref" : "https://apigateway.amazonaws.com/restapis/${ApiGatewayRestApi}/models/DailyCountModel"
               }
             }
           }
@@ -575,13 +638,13 @@ Resources:
         {
           "type": "object",
           "properties": {
-            "positive": {
+            "positives": {
               "type": "array",
               "items": {
                 "$ref": "https://apigateway.amazonaws.com/restapis/${ApiGatewayRestApi}/models/CategoricalCountModel"
               }
             },
-            "negative": {
+            "negatives": {
               "type": "array",
               "items": {
                 "$ref": "https://apigateway.amazonaws.com/restapis/${ApiGatewayRestApi}/models/CategoricalCountModel"
@@ -591,16 +654,16 @@ Resources:
         }
       ContentType: application/json
 
-  MonthlyCountModel:
+  DailyCountModel:
     Type: AWS::ApiGateway::Model
     Properties:
       RestApiId: !Ref ApiGatewayRestApi
-      Name: MonthlyCountModel
+      Name: DailyCountModel
       Schema: !Sub |
         {
           "type": "object",
           "properties": {
-            "month": {
+            "date": {
               "type": "string"
             },
             "count": {

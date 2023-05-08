@@ -19,22 +19,11 @@ class ReportGenerator:
         body = message
         recipients = [receiver_email]
 
-        """
-        emailContent = {
-            "Subject": {"Data": subject},
-            "Body": {"Text": {"Data": body}},
-            "FromEmailAddress": sender_email,
-            "To": [{"EmailAddress": r} for r in recipients],
-        }
-        """
         print(analysis_link)
-        """
-        sesClient = boto3.client("ses", region_name="us-east-1")
 
         response = ses.send_email(
-            Source=sender,
+            Source=sender_email,
             Destination={"ToAddresses": recipients},
             Message={"Subject": {"Data": subject}, "Body": {"Text": {"Data": body}}},
         )
-        """
         return {"statusCode": 200, "body": "Success!"}

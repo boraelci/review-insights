@@ -5,3 +5,4 @@ aws cloudformation deploy \
 	--template-file $CLOUDFORMATION_TEMPLATE_PATH \
 	--stack-name $CLOUDFORMATION_STACK_NAME \
 	--capabilities CAPABILITY_NAMED_IAM \
+	--parameter-overrides OpenaiApiKey=$OPENAI_API_KEY

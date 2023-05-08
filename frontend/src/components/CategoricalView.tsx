@@ -1,60 +1,57 @@
 import * as React from 'react';
-import { Line } from 'react-chartjs-2';
+import { Radar } from 'react-chartjs-2';
 
 import {
   Chart as ChartJS,
+  RadialLinearScale,
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  Filler,
   Title,
   Tooltip,
   Legend,
 } from 'chart.js';
 
-import { HistoricalDataModel } from '.';
+import { CategoricalDataModel } from '.';
 
-interface HistoricalViewProps {
-  historicalDataModel: HistoricalDataModel;
+interface CategoricalViewProps {
+  categoricalDataModel: CategoricalDataModel;
 }
 
-export function HistoricalView(props: HistoricalViewProps) {
+export function CategoricalView(props: CategoricalViewProps) {
   ChartJS.register(
-    CategoryScale,
-    LinearScale,
+    RadialLinearScale,
     PointElement,
     LineElement,
     Title,
+    Filler,
     Tooltip,
     Legend,
   );
 
-  const positives = props.historicalDataModel.positives;
-  const negatives = props.historicalDataModel.negatives;
+  const positives = props.categoricalDataModel.positives;
+  const negatives = props.categoricalDataModel.negatives;
 
   const labels: string[] = [];
   const positiveCounts: number[] = [];
   const negativeCounts: number[] = [];
 
   // Get all unique dates from both positiveData and negativeData
-  const uniqueDates = new Set([
+  const uniqueCategories = new Set([
     ...Object.keys(positives),
     ...Object.keys(negatives),
   ]);
 
-  // Create a sorted array of dates
-  const sortedDates = Array.from(uniqueDates).sort(
-    (a, b) => new Date(a).getTime() - new Date(b).getTime(),
-  );
-
   // Fill the labels, positiveCounts, and negativeCounts arrays
-  for (const date of sortedDates) {
-    labels.push(date);
-    positiveCounts.push(positives[date] || 0);
-    negativeCounts.push(negatives[date] || 0);
+  for (const category of Array.from(uniqueCategories)) {
+    labels.push(category);
+    positiveCounts.push(positives[category] || 0);
+    negativeCounts.push(negatives[category] || 0);
   }
 
-  const title = 'Review Counts by Date';
+  const title = 'Review Counts by Category';
   const options = {
     responsive: true,
     plugins: {
@@ -81,5 +78,5 @@ export function HistoricalView(props: HistoricalViewProps) {
     ],
   };
 
-  return <Line options={options} data={data} />;
+  return <Radar options={options} data={data} />;
 }
